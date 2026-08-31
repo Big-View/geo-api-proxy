@@ -1,7 +1,1 @@
-﻿{
-  "functions": {
-    "api/llm.js": {
-      "maxDuration": 60
-    }
-  }
-}
+﻿{"functions":{"api/llm.js":{"maxDuration":60}}}
