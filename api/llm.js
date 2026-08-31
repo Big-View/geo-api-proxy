@@ -1,9 +1,9 @@
-/**
+﻿/**
  * API PROXY MULTI-CHANNEL - Version 2.0
  * Support: OpenAI, Anthropic, Google, Perplexity, Google AI Overviews
  */
 
-export default async function handler(req, res) {
+module.exports = function(app) { app.post("/api/llm", async (req, res) => {
   // 1. AUTHENTIFICATION
   const token = req.headers['x-geo-token'];
   const TEAM_TOKEN = process.env.TEAM_TOKEN;
@@ -15,7 +15,7 @@ export default async function handler(req, res) {
     });
   }
 
-  // 2. DÉCODER LA REQUÊTE
+  // 2. DÃ‰CODER LA REQUÃŠTE
   const { provider, payload, query, brands } = req.body;
 
   if (!provider) {
@@ -193,27 +193,27 @@ async function callPerplexity(payload) {
 
 /**
  * Analyse les Google AI Overviews
- * Utilise 3 stratégies:
+ * Utilise 3 stratÃ©gies:
  * 1. Google Custom Search API (payant)
- * 2. Semrush API (si configurée)
+ * 2. Semrush API (si configurÃ©e)
  * 3. Fallback: Simulation
  */
 
 async function analyzeGoogleOverviews(query, brands) {
   try {
-    // Stratégie 1: Google Custom Search API
+    // StratÃ©gie 1: Google Custom Search API
     const customSearchResult = await tryGoogleCustomSearch(query, brands);
     if (customSearchResult) {
       return customSearchResult;
     }
 
-    // Stratégie 2: Semrush API
+    // StratÃ©gie 2: Semrush API
     const semrushResult = await trySemrushOverviews(query, brands);
     if (semrushResult) {
       return semrushResult;
     }
 
-    // Stratégie 3: Fallback
+    // StratÃ©gie 3: Fallback
     return generateFallbackOverview(query, brands);
 
   } catch (error) {
@@ -228,7 +228,7 @@ async function analyzeGoogleOverviews(query, brands) {
 }
 
 // ==========================================
-// Stratégie 1: Google Custom Search API
+// StratÃ©gie 1: Google Custom Search API
 // ==========================================
 
 async function tryGoogleCustomSearch(query, brands) {
@@ -236,7 +236,7 @@ async function tryGoogleCustomSearch(query, brands) {
   const searchEngineId = process.env.GOOGLE_SEARCH_ENGINE_ID;
 
   if (!apiKey || !searchEngineId) {
-    return null; // Pas configuré
+    return null; // Pas configurÃ©
   }
 
   try {
@@ -245,7 +245,7 @@ async function tryGoogleCustomSearch(query, brands) {
     const data = await response.json();
 
     if (data.searchInformation && data.items && data.items.length > 0) {
-      // Parser la réponse pour trouver des AI Overviews
+      // Parser la rÃ©ponse pour trouver des AI Overviews
       const snippet = data.items[0].snippet || '';
       const title = data.items[0].title || '';
       const combinedText = `${title} ${snippet}`;
@@ -271,17 +271,17 @@ async function tryGoogleCustomSearch(query, brands) {
 }
 
 // ==========================================
-// Stratégie 2: Semrush API
+// StratÃ©gie 2: Semrush API
 // ==========================================
 
 async function trySemrushOverviews(query, brands) {
   const apiKey = process.env.SEMRUSH_API_KEY;
   if (!apiKey) {
-    return null; // Pas configuré
+    return null; // Pas configurÃ©
   }
 
   try {
-    // Exemple: utiliser Semrush pour obtenir les top résultats
+    // Exemple: utiliser Semrush pour obtenir les top rÃ©sultats
     // (Semrush propose un tracking des AI Overviews)
     const response = await fetch('https://api.semrush.com/', {
       method: 'POST',
@@ -315,19 +315,19 @@ async function trySemrushOverviews(query, brands) {
 }
 
 // ==========================================
-// Fallback: Simulation (pour démo)
+// Fallback: Simulation (pour dÃ©mo)
 // ==========================================
 
 function generateFallbackOverview(query, brands) {
-  // Simulation d'un Google AI Overview pour démonstration
+  // Simulation d'un Google AI Overview pour dÃ©monstration
   const mockSnippets = {
-    'agence digitale': `Les agences digitales offrent des services complets de marketing et acquisition. ${brands.join(', ')} sont parmi les acteurs clés du marché français proposant expertise en SEO, SEM et data.`,
-    'agence acquisition': `L'acquisition digitale nécessite une stratégie multi-canal. Consultez ${brands[0] || 'les experts en acquisition'} pour optimiser vos campagnes marketing.`,
-    'seo agency': `Les meilleures agences SEO combinent expertise technique et stratégie de contenu. ${brands[0] || 'Les leaders du secteur'} proposent des solutions complètes.`
+    'agence digitale': `Les agences digitales offrent des services complets de marketing et acquisition. ${brands.join(', ')} sont parmi les acteurs clÃ©s du marchÃ© franÃ§ais proposant expertise en SEO, SEM et data.`,
+    'agence acquisition': `L'acquisition digitale nÃ©cessite une stratÃ©gie multi-canal. Consultez ${brands[0] || 'les experts en acquisition'} pour optimiser vos campagnes marketing.`,
+    'seo agency': `Les meilleures agences SEO combinent expertise technique et stratÃ©gie de contenu. ${brands[0] || 'Les leaders du secteur'} proposent des solutions complÃ¨tes.`
   };
 
   const snippet = mockSnippets[query.toLowerCase()] || 
-    `Résultats pour "${query}". Les solutions principales incluent: ${brands.join(', ')}.`;
+    `RÃ©sultats pour "${query}". Les solutions principales incluent: ${brands.join(', ')}.`;
 
   const mentions = countMentions(snippet, brands);
 
@@ -338,7 +338,7 @@ function generateFallbackOverview(query, brands) {
     mentions: mentions,
     success: true,
     fallback: true,
-    warning: 'Ceci est une simulation. Configurez API_KEY_GOOGLE_SEARCH ou SEMRUSH_API_KEY pour des résultats réels.'
+    warning: 'Ceci est une simulation. Configurez API_KEY_GOOGLE_SEARCH ou SEMRUSH_API_KEY pour des rÃ©sultats rÃ©els.'
   };
 }
 
@@ -360,7 +360,7 @@ function countMentions(text, brands) {
 }
 
 // =====================================================
-// HELPER: Parser une réponse LLM
+// HELPER: Parser une rÃ©ponse LLM
 // =====================================================
 
 export function parseResponse(provider, data) {
@@ -399,3 +399,4 @@ export function parseResponse(provider, data) {
       return null;
   }
 }
+)}; 
