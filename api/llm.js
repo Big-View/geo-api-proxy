@@ -1,7 +1,7 @@
 ﻿/**
- * API PROXY MULTI-CHANNEL - Version 2.0
+ * API PROXY MULTI-CHANNEL - Version 2.0 FIXED
  * Support: OpenAI, Anthropic, Google, Perplexity, Google AI Overviews
- * CommonJS format for Express/Render
+ * Transforms query into proper message format for each provider
  */
 
 module.exports = function(app) {
@@ -33,16 +33,16 @@ module.exports = function(app) {
       
       switch (provider.toLowerCase()) {
         case 'openai':
-          response = await callOpenAI(payload);
+          response = await callOpenAI(query);
           break;
         case 'anthropic':
-          response = await callAnthropic(payload);
+          response = await callAnthropic(query);
           break;
         case 'google':
-          response = await callGoogle(payload);
+          response = await callGoogle(query);
           break;
         case 'perplexity':
-          response = await callPerplexity(payload);
+          response = await callPerplexity(query);
           break;
         case 'google_overviews':
           response = await analyzeGoogleOverviews(query, brands);
@@ -71,7 +71,7 @@ module.exports = function(app) {
 // PROVIDER 1: OPENAI (ChatGPT - GPT-4o)
 // =====================================================
 
-async function callOpenAI(payload) {
+async function callOpenAI(query) {
   const apiKey = process.env.API_KEY_OPENAI;
   if (!apiKey) throw new Error('OpenAI API key not configured');
 
@@ -82,26 +82,33 @@ async function callOpenAI(payload) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: payload.model || 'gpt-4o',
-      messages: payload.messages || [],
-      temperature: payload.temperature || 0.7,
-      max_tokens: payload.max_tokens || 1000
+      model: 'gpt-4o',
+      messages: [
+        { role: 'user', content: query }
+      ],
+      temperature: 0.7,
+      max_tokens: 500
     })
   });
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(`OpenAI Error: ${error.error.message}`);
+    throw new Error(`OpenAI Error: ${error.error?.message || 'Unknown error'}`);
   }
 
-  return await response.json();
+  const data = await response.json();
+  return {
+    status: 'success',
+    provider: 'openai',
+    content: data.choices?.[0]?.message?.content || 'No response'
+  };
 }
 
 // =====================================================
-// PROVIDER 2: ANTHROPIC (Claude - claude-opus-4-8)
+// PROVIDER 2: ANTHROPIC (Claude)
 // =====================================================
 
-async function callAnthropic(payload) {
+async function callAnthropic(query) {
   const apiKey = process.env.API_KEY_ANTHROPIC;
   if (!apiKey) throw new Error('Anthropic API key not configured');
 
@@ -113,50 +120,76 @@ async function callAnthropic(payload) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: payload.model || 'claude-opus-4-8',
-      max_tokens: payload.max_tokens || 1000,
-      messages: payload.messages || []
+      model: 'claude-opus-4-8',
+      max_tokens: 500,
+      messages: [
+        { role: 'user', content: query }
+      ]
     })
   });
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(`Anthropic Error: ${error.error.message}`);
+    throw new Error(`Anthropic Error: ${error.error?.message || 'Unknown error'}`);
   }
 
-  return await response.json();
+  const data = await response.json();
+  return {
+    status: 'success',
+    provider: 'anthropic',
+    content: data.content?.[0]?.text || 'No response'
+  };
 }
 
 // =====================================================
-// PROVIDER 3: GOOGLE (Gemini - gemini-pro)
+// PROVIDER 3: GOOGLE (Gemini)
 // =====================================================
 
-async function callGoogle(payload) {
+async function callGoogle(query) {
   const apiKey = process.env.API_KEY_GOOGLE;
   if (!apiKey) throw new Error('Google API key not configured');
 
-  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      contents: payload.contents || [],
-      generationConfig: {
-        maxOutputTokens: payload.max_tokens || 1000,
-        temperature: payload.temperature || 0.7
-      }
-    }),
-  }).then(r => r.ok ? r.json() : (() => { throw new Error('Google API error'); })());
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: query }
+            ]
+          }
+        ],
+        generationConfig: {
+          maxOutputTokens: 500,
+          temperature: 0.7
+        }
+      })
+    }
+  );
 
-  return response;
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`Google Error: ${error.error?.message || 'Unknown error'}`);
+  }
+
+  const data = await response.json();
+  return {
+    status: 'success',
+    provider: 'google',
+    content: data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response'
+  };
 }
 
 // =====================================================
-// PROVIDER 4: PERPLEXITY (pplx-sonar)
+// PROVIDER 4: PERPLEXITY
 // =====================================================
 
-async function callPerplexity(payload) {
+async function callPerplexity(query) {
   const apiKey = process.env.API_KEY_PERPLEXITY;
   if (!apiKey) throw new Error('Perplexity API key not configured');
 
@@ -167,23 +200,30 @@ async function callPerplexity(payload) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: payload.model || 'pplx-sonar-pro',
-      messages: payload.messages || [],
-      max_tokens: payload.max_tokens || 1000,
-      temperature: payload.temperature || 0.7
+      model: 'pplx-sonar-pro',
+      messages: [
+        { role: 'user', content: query }
+      ],
+      max_tokens: 500,
+      temperature: 0.7
     })
   });
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(`Perplexity Error: ${error.error.message}`);
+    throw new Error(`Perplexity Error: ${error.error?.message || 'Unknown error'}`);
   }
 
-  return await response.json();
+  const data = await response.json();
+  return {
+    status: 'success',
+    provider: 'perplexity',
+    content: data.choices?.[0]?.message?.content || 'No response'
+  };
 }
 
 // =====================================================
-// PROVIDER 5: GOOGLE AI OVERVIEWS (via Custom Search)
+// PROVIDER 5: GOOGLE AI OVERVIEWS
 // =====================================================
 
 async function analyzeGoogleOverviews(query, brands) {
@@ -206,27 +246,15 @@ async function analyzeGoogleOverviews(query, brands) {
 
     const data = await response.json();
     
-    // Extract snippet from first result (simulates AI Overview)
+    // Extract snippet from first result
     const snippet = data.items?.[0]?.snippet || 'No results found';
+    const title = data.items?.[0]?.title || 'No title';
     
-    // Count brand mentions
-    const mentions = {};
-    if (Array.isArray(brands)) {
-      brands.forEach(brand => {
-        const regex = new RegExp(brand, 'gi');
-        const count = (data.items || []).reduce((sum, item) => {
-          const text = (item.snippet || '').match(regex) || [];
-          return sum + text.length;
-        }, 0);
-        mentions[brand] = count;
-      });
-    }
-
     return {
       status: 'success',
       provider: 'google_overviews',
-      snippet: snippet,
-      mentions: mentions,
+      title: title,
+      content: snippet,
       totalResults: data.queries?.request?.[0]?.totalResults || 0
     };
 
