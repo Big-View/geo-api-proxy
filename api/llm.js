@@ -9,8 +9,13 @@ module.exports = function(app) {
     console.log("  Headers:", JSON.stringify(req.headers).substring(0, 200));
     
     // 1. AUTHENTIFICATION
-    const token = req.headers['x-geo-token'];
+    let token = req.headers['x-geo-token'];
     const TEAM_TOKEN = process.env.TEAM_TOKEN;
+
+    // DECODE %2B to + if needed
+    if (token) {
+      token = decodeURIComponent(token);
+    }
 
     console.log("🔐 [AUTH CHECK]");
     console.log("  Token received:", token || "MISSING");
