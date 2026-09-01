@@ -230,7 +230,7 @@ async function callPerplexity(query) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: 'pplx-sonar-pro',
+      model: 'perplexity/sonar',
       messages: [
         { role: 'user', content: query }
       ],
