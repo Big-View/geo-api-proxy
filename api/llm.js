@@ -13,9 +13,16 @@ module.exports = function(app) {
     const TEAM_TOKEN = process.env.TEAM_TOKEN;
 
     console.log("🔐 [AUTH CHECK]");
-    console.log("  Token received:", token ? `${token.substring(0, 10)}...` : "MISSING");
-    console.log("  Token expected:", TEAM_TOKEN ? `${TEAM_TOKEN.substring(0, 10)}...` : "NOT SET");
+    console.log("  Token received:", token || "MISSING");
+    console.log("  Token expected:", TEAM_TOKEN || "NOT SET");
     console.log("  Match:", token === TEAM_TOKEN);
+    if (token && TEAM_TOKEN && token !== TEAM_TOKEN) {
+      console.log("  MISMATCH DETAILS:");
+      console.log("    Received length:", token.length);
+      console.log("    Expected length:", TEAM_TOKEN.length);
+      console.log("    Received bytes:", Buffer.from(token).toString('hex'));
+      console.log("    Expected bytes:", Buffer.from(TEAM_TOKEN).toString('hex'));
+    }
 
     if (!token || token !== TEAM_TOKEN) {
       console.log("❌ [UNAUTHORIZED]");
