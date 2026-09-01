@@ -1,24 +1,36 @@
 ﻿/**
- * API PROXY MULTI-CHANNEL - Version 2.0 FIXED
- * Support: OpenAI, Anthropic, Google, Perplexity, Google AI Overviews
- * Transforms query into proper message format for each provider
+ * API PROXY MULTI-CHANNEL - Version 2.0 WITH DEBUG LOGS
  */
 
 module.exports = function(app) {
   app.post("/api/llm", async (req, res) => {
+    console.log("📩 [REQUEST RECEIVED]");
+    console.log("  Body:", JSON.stringify(req.body).substring(0, 100));
+    console.log("  Headers:", JSON.stringify(req.headers).substring(0, 200));
+    
     // 1. AUTHENTIFICATION
     const token = req.headers['x-geo-token'];
     const TEAM_TOKEN = process.env.TEAM_TOKEN;
 
+    console.log("🔐 [AUTH CHECK]");
+    console.log("  Token received:", token ? `${token.substring(0, 10)}...` : "MISSING");
+    console.log("  Token expected:", TEAM_TOKEN ? `${TEAM_TOKEN.substring(0, 10)}...` : "NOT SET");
+    console.log("  Match:", token === TEAM_TOKEN);
+
     if (!token || token !== TEAM_TOKEN) {
+      console.log("❌ [UNAUTHORIZED]");
       return res.status(401).json({ 
         error: 'Unauthorized',
         message: 'Invalid or missing authentication token'
       });
     }
 
+    console.log("✅ [AUTHORIZED]");
+
     // 2. DÉCODER LA REQUÊTE
     const { provider, payload, query, brands } = req.body;
+
+    console.log(`📤 [DISPATCHING] Provider: ${provider}`);
 
     if (!provider) {
       return res.status(400).json({ 
@@ -33,18 +45,23 @@ module.exports = function(app) {
       
       switch (provider.toLowerCase()) {
         case 'openai':
+          console.log("  → Calling OpenAI...");
           response = await callOpenAI(query);
           break;
         case 'anthropic':
+          console.log("  → Calling Anthropic...");
           response = await callAnthropic(query);
           break;
         case 'google':
+          console.log("  → Calling Google...");
           response = await callGoogle(query);
           break;
         case 'perplexity':
+          console.log("  → Calling Perplexity...");
           response = await callPerplexity(query);
           break;
         case 'google_overviews':
+          console.log("  → Analyzing Google Overviews...");
           response = await analyzeGoogleOverviews(query, brands);
           break;
         default:
@@ -54,10 +71,11 @@ module.exports = function(app) {
           });
       }
 
+      console.log(`✅ [SUCCESS] ${provider} responded`);
       return res.status(200).json(response);
 
     } catch (error) {
-      console.error(`[${provider.toUpperCase()}] Error:`, error);
+      console.error(`❌ [ERROR] ${provider}:`, error.message);
       return res.status(500).json({ 
         error: 'API Error',
         message: error.message,
@@ -68,7 +86,7 @@ module.exports = function(app) {
 };
 
 // =====================================================
-// PROVIDER 1: OPENAI (ChatGPT - GPT-4o)
+// PROVIDER 1: OPENAI
 // =====================================================
 
 async function callOpenAI(query) {
@@ -105,7 +123,7 @@ async function callOpenAI(query) {
 }
 
 // =====================================================
-// PROVIDER 2: ANTHROPIC (Claude)
+// PROVIDER 2: ANTHROPIC
 // =====================================================
 
 async function callAnthropic(query) {
@@ -142,7 +160,7 @@ async function callAnthropic(query) {
 }
 
 // =====================================================
-// PROVIDER 3: GOOGLE (Gemini)
+// PROVIDER 3: GOOGLE
 // =====================================================
 
 async function callGoogle(query) {
@@ -223,7 +241,7 @@ async function callPerplexity(query) {
 }
 
 // =====================================================
-// PROVIDER 5: GOOGLE AI OVERVIEWS
+// PROVIDER 5: GOOGLE OVERVIEWS
 // =====================================================
 
 async function analyzeGoogleOverviews(query, brands) {
@@ -246,7 +264,6 @@ async function analyzeGoogleOverviews(query, brands) {
 
     const data = await response.json();
     
-    // Extract snippet from first result
     const snippet = data.items?.[0]?.snippet || 'No results found';
     const title = data.items?.[0]?.title || 'No title';
     
