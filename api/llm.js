@@ -46,7 +46,7 @@ module.exports = function(app) {
   // ---------- LLM ----------
   app.post("/api/llm", async (req, res) => {
     if (!checkAuth(req, res)) return;
-    const { provider, query, brands } = req.body;
+    const { provider, query, brands, location } = req.body;
     console.log(`📤 [DISPATCHING] Provider: ${provider}`);
 
     if (!provider) return res.status(400).json({ error: 'Bad Request', message: 'Provider parameter is required' });
@@ -59,7 +59,7 @@ module.exports = function(app) {
         case 'anthropic':        response = await callAnthropic(query); break;
         case 'google':           response = await callGoogle(query); break;
         case 'perplexity':       response = await callPerplexity(query); break;
-        case 'google_overviews': response = await analyzeGoogleOverviews(query, brands); break;
+        case 'google_overviews': response = await analyzeGoogleOverviews(query, brands, location); break;
         default:
           return res.status(400).json({ error: 'Unknown provider', message: `Provider '${provider}' is not supported` });
       }
@@ -343,12 +343,15 @@ async function callPerplexity(query) {
 // =====================================================
 // PROVIDER 5: GOOGLE OVERVIEWS (SerpAPI, repli Custom Search)
 // =====================================================
-async function analyzeGoogleOverviews(query, brands) {
-  if (process.env.SERPAPI_KEY) return analyzeViaSerpApi(query, brands);
+async function analyzeGoogleOverviews(query, brands, location) {
+  if (process.env.SERPAPI_KEY) return analyzeViaSerpApi(query, brands, location);
   return analyzeViaCustomSearch(query, brands);
 }
 
-async function analyzeViaSerpApi(query, brands) {
+// Domaines emploi/RH : exclus du comptage organique (offres d'emploi ≠ visibilité commerciale)
+const JOB_DOMAINS = /indeed|hellowork|glassdoor|welcometothejungle|linkedin\.com\/jobs|jobteaser|apec\.fr|francetravail|pole-emploi|meteojob|jobijoba|monster\.fr|regionsjob|studentjob/i;
+
+async function analyzeViaSerpApi(query, brands, location) {
   const apiKey = process.env.SERPAPI_KEY;
   const params = new URLSearchParams({
     engine: 'google', q: query,
@@ -356,6 +359,7 @@ async function analyzeViaSerpApi(query, brands) {
     google_domain: process.env.SERP_DOMAIN || 'google.fr',
     api_key: apiKey
   });
+  if (location && String(location).trim()) params.set('location', String(location).trim().slice(0, 120));
   const response = await fetch(`https://serpapi.com/search.json?${params}`);
   if (!response.ok) throw new Error(`SerpAPI Error ${response.status}: ${await readError(response)}`);
   const data = await response.json();
@@ -371,15 +375,17 @@ async function analyzeViaSerpApi(query, brands) {
   const aioText = extractAioText(aio);
   const aioSources = (aio?.references || []).map(r => ({ title: r.title, link: r.link, source: r.source }));
   const organic = (data.organic_results || []).slice(0, 10).map(r => ({
-    position: r.position, title: r.title, link: r.link, snippet: r.snippet || ''
+    position: r.position, title: r.title, link: r.link, snippet: r.snippet || '', isJob: JOB_DOMAINS.test(r.link || '')
   }));
+  const organicClean = organic.filter(o => !o.isJob);
   const content = aioText || (organic.length ? organic.map(o => `${o.title}\n${o.snippet}`).join('\n\n') : 'No results found');
 
   return {
     status: 'success', provider: 'google_overviews', source: 'serpapi',
     hasAiOverview: Boolean(aioText), content,
     aiOverview: aioText || null, aiOverviewSources: aioSources, organic,
-    brandMentions: countMentions(`${aioText || ''}\n${organic.map(o => o.title + ' ' + o.snippet).join(' ')}`, brands)
+    location: location || null,
+    brandMentions: countMentions(`${aioText || ''}\n${organicClean.map(o => o.title + ' ' + o.snippet).join(' ')}`, brands)
   };
 }
 
