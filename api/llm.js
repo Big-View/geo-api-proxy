@@ -424,3 +424,4 @@ async function analyzeViaCustomSearch(query, brands) {
     brandMentions: countMentions(content, brands)
   };
 }
+
