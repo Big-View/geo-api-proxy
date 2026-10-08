@@ -1,0 +1,163 @@
+<!-- wp:html -->
+<style>
+.bvc{--g:#04D99D;--c:#29D5F2;--y:#F3D604;--d:#131313;--t:#595959;--l:#E6E6E6;--bg:#F3F3F3;--gp:#F0FAF6;font-family:Roboto,Arial,sans-serif;color:var(--t);font-size:17px;line-height:1.7;max-width:100%;margin:0 auto;padding:0 16px;box-sizing:border-box}
+.bvc *,.bvc *::before,.bvc *::after{box-sizing:border-box}
+.bvc h2,.bvc h3{font-family:Poppins,Arial,sans-serif;font-weight:700;color:var(--d);line-height:1.25}
+.bvc h2{font-size:1.6rem;margin:2em 0 .6em}
+.bvc h3{font-size:1.15rem;margin:1.4em 0 .4em}
+.bvc a{color:#039E73;text-decoration:underline}
+.bvc .lead{font-size:1.1rem}
+.bvc .byline{display:flex;align-items:center;gap:14px;margin:0 0 1.2em}
+.bvc .byline img{width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid var(--g)}
+.bvc .byline p{margin:0;font-size:.92rem;line-height:1.4}
+.bvc .byline strong{color:var(--d);font-family:Poppins,Arial,sans-serif}
+.bvc .answer{background:var(--gp);border-left:5px solid var(--g);border-radius:0 20px 20px 0;padding:18px 22px;margin:1.2em 0;color:var(--d)}
+.bvc .accroche{background:var(--y);color:#000;border-radius:20px;padding:20px 24px;margin:1.6em 0;font-family:Poppins,Arial,sans-serif;font-weight:700;font-size:1.05rem;line-height:1.45}
+.bvc .tablewrap{overflow-x:auto;margin:1.2em 0;border:1px solid var(--l);border-radius:18px}
+.bvc table{border-collapse:collapse;width:100%;min-width:560px;font-size:.95rem}
+.bvc th{background:var(--g);color:#fff;text-align:left;padding:12px 14px;font-family:Poppins,Arial,sans-serif}
+.bvc td{padding:12px 14px;border-top:1px solid var(--l);vertical-align:top}
+.bvc .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:1.2em 0}
+.bvc .card{background:var(--bg);border-radius:20px;padding:18px 20px}
+.bvc .card .n{font-family:Poppins,Arial,sans-serif;font-weight:700;font-size:1.9rem;color:var(--g);line-height:1.1}
+.bvc .card p{margin:.4em 0 0;font-size:.92rem}
+.bvc figure.info{margin:1.6em 0;background:#fff;border:1px solid var(--l);border-radius:20px;padding:20px 22px}
+.bvc figure.info figcaption{font-size:.8rem;color:#7A7A7A;margin-top:12px}
+.bvc .info-title{font-family:Poppins,Arial,sans-serif;font-weight:700;color:var(--d);font-size:1.02rem;margin:0 0 14px}
+.bvc .tl{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.bvc .tl li{position:relative;padding-top:20px;font-size:.84rem;line-height:1.4}
+.bvc .tl li::before{content:"";position:absolute;top:0;left:0;right:-10px;height:4px;background:var(--l)}
+.bvc .tl li::after{content:"";position:absolute;top:-5px;left:0;width:14px;height:14px;border-radius:50%;background:var(--g)}
+.bvc .tl li.now::after{background:var(--y);box-shadow:0 0 0 4px rgba(243,214,4,.35)}
+.bvc .tl b{display:block;font-family:Poppins,Arial,sans-serif;color:var(--d);font-size:.82rem;margin-bottom:2px}
+.bvc .bar{margin:10px 0}
+.bvc .bar span{display:block;font-size:.88rem;color:var(--d);margin-bottom:4px}
+.bvc .bar i{display:block;height:26px;border-radius:13px;background:linear-gradient(106deg,#04D99D,#29D5F2);color:#131313;font-style:normal;font-weight:700;font-size:.85rem;line-height:26px;padding-left:12px;font-family:Poppins,Arial,sans-serif;white-space:nowrap}
+.bvc .bar.y i{background:var(--y)}
+.bvc .team{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:1.2em 0}
+.bvc .member{background:var(--bg);border-radius:20px;padding:18px;text-align:center}
+.bvc .member img{width:104px;height:104px;border-radius:50%;object-fit:cover;border:3px solid var(--g);margin:0 auto 10px;display:block}
+.bvc .member strong{display:block;color:var(--d);font-family:Poppins,Arial,sans-serif}
+.bvc .member em{display:block;font-style:normal;font-size:.82rem;color:#7A7A7A;margin:2px 0 8px}
+.bvc .member p{margin:0;font-size:.88rem;line-height:1.45}
+.bvc .cities{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:1.2em 0}
+.bvc .cities a{display:block;background:var(--gp);border:1px solid var(--g);border-radius:20px;padding:14px 16px;text-decoration:none;color:var(--d);font-weight:700;font-family:Poppins,Arial,sans-serif}
+.bvc .cities a span{display:block;font-weight:400;font-size:.82rem;color:var(--t);font-family:Roboto,Arial,sans-serif}
+.bvc .dark{background:var(--d);color:#fff;border-radius:20px;padding:28px 26px;margin:2em 0}
+.bvc .dark h2{color:#fff;margin-top:0}
+.bvc .dark p{color:#e8e8e8}
+.bvc .dark .slogan{color:var(--g);font-weight:700;font-family:Poppins,Arial,sans-serif}
+.bvc .btn{display:inline-block;background:linear-gradient(106deg,#04D99D,#29D5F2);color:#131313;font-weight:700;text-decoration:none;padding:12px 22px;border-radius:20px;font-family:Poppins,Arial,sans-serif;transition:transform .2s}
+.bvc .btn:hover{transform:scale(1.05)}
+.bvc details{border:1px solid var(--l);border-radius:20px;padding:14px 20px;margin:10px 0;background:#fff}
+.bvc summary{cursor:pointer;font-family:Poppins,Arial,sans-serif;font-weight:700;color:var(--d)}
+.bvc details p{margin:.7em 0 0}
+.bvc .src{font-size:.85rem;color:#7A7A7A}
+.bvc .src li{margin:4px 0}
+@media(max-width:980px){.bvc .grid,.bvc .team,.bvc .cities{grid-template-columns:repeat(2,1fr)}.bvc .tl{grid-template-columns:repeat(3,1fr);row-gap:20px}}
+@media(max-width:640px){.bvc{font-size:16px}.bvc h2{font-size:1.35rem}.bvc .grid,.bvc .team,.bvc .cities{grid-template-columns:1fr}.bvc .tl{grid-template-columns:1fr}.bvc .tl li{padding:0 0 0 26px}.bvc .tl li::before{top:0;bottom:-14px;left:6px;right:auto;width:4px;height:auto}.bvc .tl li::after{top:2px;left:0}}
+</style>
+<div class="bvc">
+<div class="byline"><img decoding="async" src="https://big-view.fr/wp-content/uploads/2026/02/Florent-Buil.jpg" alt="Portrait de Florent Buil, fondateur de Big View" width="72" height="72" />
+<p><strong>Florent Buil</strong>, fondateur de Big View<br />17 ans d'expérience en acquisition digitale · Publié le 8 octobre 2026</p>
+</div>
+
+<p class="lead"><strong>Vous avez entendu parler de Personal Intelligence, la fonction de Gemini qui lit Gmail et Google Photos ?</strong><br /><strong>Vous vous demandez si elle est disponible en France ?</strong><br /><strong>Vous voulez savoir ce qu'elle change pour la visibilité de votre marque dans les réponses de l'IA ?</strong></p>
+
+<p>Depuis janvier 2026, Google relie Gemini aux applications de ses utilisateurs : Gmail, Google Photos, YouTube, l'historique de recherche. L'assistant ne répond plus seulement à la question posée. Il répond à la personne qui la pose. Pour une marque, c'est un changement de taille : deux internautes qui tapent la même question n'obtiennent plus la même réponse. On fait le point, faits datés à l'appui, et on vous dit quoi faire dès maintenant.</p>
+
+<div class="answer"><strong>En bref.</strong> Personal Intelligence est une option de Gemini, désactivée par défaut, qui permet à l'assistant de s'appuyer sur Gmail, Google Photos, YouTube et la recherche Google de l'utilisateur pour personnaliser ses réponses. Lancée en bêta aux États-Unis le 14 janvier 2026 pour les abonnés Google AI Pro et AI Ultra, elle a été ouverte aux utilisateurs gratuits américains en mars 2026, puis étendue à d'autres pays en avril. D'après la presse spécialisée, l'Europe, France comprise, restait exclue de ce déploiement. Pour les marques, l'enjeu est clair : la réponse de l'IA dépend désormais aussi de ce que l'utilisateur a déjà reçu, vu et cherché.</div>
+
+<figure class="info" role="img" aria-label="Chronologie de Personal Intelligence de janvier à avril 2026">
+<p class="info-title">Personal Intelligence en 4 dates</p>
+<ol class="tl">
+<li><b>14 janv. 2026</b>Lancement en bêta aux États-Unis, abonnés Google AI Pro et AI Ultra.</li>
+<li><b>17 mars 2026</b>Ouverture aux utilisateurs gratuits américains : AI Mode, application Gemini, Gemini dans Chrome.</li>
+<li><b>Avril 2026</b>Arrivée en Inde, puis déploiement annoncé dans d'autres pays.</li>
+<li class="now"><b>14 avr. 2026</b>9to5Google : déploiement mondial de l'application Gemini, Europe exclue.</li>
+</ol>
+<figcaption>Sources : Google, CNBC, MacRumors, 9to5Google, Notebookcheck. Voir la liste en bas d'article.</figcaption>
+</figure>
+
+<h2>Personal Intelligence, c'est quoi exactement ?</h2>
+<p>C'est un réglage qui autorise Gemini à consulter les applications Google de l'utilisateur au moment de répondre. Au lancement, quatre sources étaient concernées : Gmail, Google Photos, YouTube et la recherche Google. L'utilisateur active la fonction lui-même, choisit les applications reliées et peut tout couper à tout moment.</p>
+<p>Google a illustré l'usage avec un exemple simple. Josh Woodward, vice-président de Google Labs et de l'application Gemini, raconte avoir demandé conseil pour changer les pneus de sa voiture. Gemini a retrouvé ses photos de road trip en famille pour comprendre son usage, puis a lu la plaque d'immatriculation sur une autre photo. Deux forces, selon Google : raisonner en croisant plusieurs sources, et retrouver un détail précis dans un e-mail ou une image.</p>
+<p>Côté confidentialité, Google indique ne pas entraîner ses modèles directement sur la boîte Gmail ni sur la photothèque. L'entraînement porte sur des éléments limités comme les requêtes et les réponses. Les réponses citent les sources personnelles utilisées, et Gemini évite les suppositions sur les sujets sensibles comme la santé, sauf demande explicite. La fonction est réservée aux comptes personnels, pas aux comptes Google Workspace professionnels.</p>
+
+<h2>Personal Intelligence est-elle disponible en France ?</h2>
+<p>Pas à notre connaissance au 8 octobre 2026. Le lancement était américain, l'ouverture aux comptes gratuits aussi. En avril 2026, l'Inde a suivi, puis un déploiement plus large de l'application Gemini, dont 9to5Google précise qu'il exclut l'Europe. Nous n'avons trouvé aucune annonce de Google donnant une date pour la France ou l'Espace économique européen.</p>
+<p>Ce retard européen n'est pas une raison d'attendre. Vos clients français qui voyagent, vos marchés export et les utilisateurs américains de votre marque y ont déjà accès. Et ce que l'on observe aux États-Unis arrive en général en Europe avec quelques mois de décalage.</p>
+
+<div class="tablewrap">
+<table>
+<thead>
+<tr><th>Point clé</th><th>Ce que l'on sait</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Sources reliées</strong></td><td>Gmail, Google Photos, YouTube, recherche Google</td></tr>
+<tr><td><strong>Activation</strong></td><td>Désactivée par défaut, activée par l'utilisateur, application par application</td></tr>
+<tr><td><strong>Produits</strong></td><td>Application Gemini, AI Mode dans la recherche, Gemini dans Chrome (États-Unis, mars 2026)</td></tr>
+<tr><td><strong>Comptes</strong></td><td>Comptes Google personnels, gratuits et payants selon les pays</td></tr>
+<tr><td><strong>Pays</strong></td><td>États-Unis, puis Inde et d'autres pays. Europe exclue selon la presse spécialisée d'avril 2026</td></tr>
+<tr><td><strong>Données d'entraînement</strong></td><td>Pas d'entraînement direct sur Gmail et Photos selon Google, requêtes et réponses utilisées de façon limitée</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>Ce que Personal Intelligence change pour votre marque</h2>
+<h3>1. Une même question, des réponses différentes</h3>
+<p>Jusqu'ici, une réponse d'IA variait surtout selon la formulation et le lieu. Avec Personal Intelligence, elle varie aussi selon l'historique de chacun. Un internaute qui a acheté chez vous, qui reçoit votre newsletter ou qui a regardé vos vidéos YouTube peut voir votre marque remonter. Un autre, avec la même question, ne la verra pas. La visibilité dans l'IA devient en partie individuelle.</p>
+<h3>2. Votre boîte mail client devient un canal de visibilité</h3>
+<p>Confirmations de commande, factures, e-mails de suivi, newsletters : tout ce qui arrive dans Gmail peut servir de contexte à Gemini. Un e-mail clair, avec le nom du produit, la référence, la date de livraison et les conditions de retour, a plus de chances d'être bien repris qu'un visuel sans texte. Le CRM et l'e-mailing rejoignent donc le GEO.</p>
+<h3>3. YouTube pèse plus lourd</h3>
+<p>L'historique YouTube fait partie des sources reliées. Une marque qui publie des tutoriels, des comparatifs ou des démonstrations alimente directement le contexte de ceux qui les regardent. Titres, descriptions et chapitres explicites aident l'IA à comprendre de quoi parle la vidéo.</p>
+<h3>4. Le contenu public reste la base</h3>
+<p>Personal Intelligence ne remplace pas le web. Quand Gemini recommande un produit, il croise le contexte personnel avec ce qu'il trouve en ligne : vos pages, vos avis, vos fiches Google Business Profile, les articles qui parlent de vous. Si ces sources sont floues ou incomplètes, le contexte personnel ne suffira pas à vous faire citer.</p>
+<h3>5. Mesurer devient plus difficile</h3>
+<p>Un outil de suivi interroge les IA sans historique personnel. Il mesure donc la réponse « par défaut », pas celle que voit chaque client. Ce socle reste le meilleur indicateur disponible et le plus comparable dans le temps. Il faut simplement le lire comme une base, et le compléter par vos données propres : trafic issu des IA dans GA4, demandes entrantes qui citent Gemini ou ChatGPT, ventes assistées.</p>
+
+<div class="accroche">Avec Personal Intelligence, l'IA ne choisit plus seulement la meilleure réponse. Elle choisit la meilleure réponse pour chaque personne. Votre marque doit être présente partout où se construit ce contexte.</div>
+
+<h2>Notre plan d'action en 5 points</h2>
+<div class="grid">
+<div class="card"><div class="n">01.</div><p><strong>Auditer votre visibilité dans les IA</strong> sur vos requêtes clés, sans historique, pour connaître votre point de départ.</p></div>
+<div class="card"><div class="n">02.</div><p><strong>Rendre vos e-mails transactionnels lisibles</strong> : texte réel, noms de produits, références, dates, liens vers vos pages.</p></div>
+<div class="card"><div class="n">03.</div><p><strong>Structurer vos pages</strong> : données structurées, FAQ factuelle, phrases courtes et citables, informations à jour.</p></div>
+<div class="card"><div class="n">04.</div><p><strong>Soigner YouTube</strong> : titres explicites, descriptions complètes, chapitres et sous-titres.</p></div>
+<div class="card"><div class="n">05.</div><p><strong>Mesurer dans la durée</strong> : suivi de vos citations sur plusieurs IA, croisé avec le trafic et les conversions issus des assistants.</p></div>
+<div class="card"><div class="n">+</div><p><strong>Préparer l'arrivée en Europe</strong> : tester dès maintenant sur vos audiences américaines ou export si vous en avez.</p></div>
+</div>
+
+<p>Pour la mesure, notre outil <a href="https://big-view.fr/geo-share-of-voice/">GEO Share of Voice</a> suit vos citations sur cinq canaux d'IA, dont Claude, avec historique. Il est proposé à 340 € HT par mois, avec une offre de lancement à 250 € HT par mois pour les 20 premiers clients. Si vous utilisez déjà Gemini en interne, notre page <a href="https://big-view.fr/gem-gemini/">Gem Gemini</a> peut aussi vous intéresser.</p>
+
+<h2>Questions fréquentes</h2>
+<details><summary>Qu'est-ce que Personal Intelligence dans Gemini ?</summary><p>Personal Intelligence est une option de Gemini, l'assistant IA de Google, qui permet de relier l'assistant à Gmail, Google Photos, YouTube et la recherche Google de l'utilisateur. Gemini s'appuie alors sur ces contenus pour personnaliser ses réponses. La fonction est désactivée par défaut et l'utilisateur choisit les applications reliées.</p></details>
+<details><summary>Personal Intelligence est-elle disponible en France ?</summary><p>Pas à notre connaissance au 8 octobre 2026. La fonction a été lancée aux États-Unis le 14 janvier 2026, ouverte aux utilisateurs gratuits américains en mars 2026, puis déployée en Inde et dans d'autres pays en avril 2026. Selon 9to5Google, ce déploiement excluait l'Europe. Google n'a pas communiqué de date pour la France.</p></details>
+<details><summary>Google utilise-t-il mes e-mails pour entraîner Gemini ?</summary><p>Selon Google, Gemini n'est pas entraîné directement sur la boîte Gmail ni sur la photothèque Google Photos. L'entraînement porte sur des informations limitées, comme les requêtes et les réponses du modèle. L'utilisateur peut désactiver Personal Intelligence ou déconnecter une application à tout moment.</p></details>
+<details><summary>Quel impact Personal Intelligence a-t-elle sur le GEO ?</summary><p>Le GEO (Generative Engine Optimization) vise à faire citer une marque dans les réponses des IA. Avec Personal Intelligence, ces réponses dépendent aussi de l'historique de chaque utilisateur : e-mails reçus, vidéos vues, recherches passées. Le contenu public reste la base, mais les e-mails clients, YouTube et la cohérence des informations de marque prennent plus de poids.</p></details>
+<details><summary>Comment mesurer sa visibilité dans Gemini si les réponses sont personnalisées ?</summary><p>On mesure d'abord la réponse sans historique personnel, sur un panel fixe de requêtes et sur plusieurs IA, pour obtenir une base comparable dans le temps. On la complète ensuite par ses propres données : trafic issu des assistants IA dans l'analytics, demandes entrantes qui citent une IA, conversions associées.</p></details>
+<details><summary>Personal Intelligence fonctionne-t-elle avec un compte Google Workspace ?</summary><p>Non, d'après les informations publiées au lancement : la fonction est réservée aux comptes Google personnels. Elle ne concerne donc pas les comptes professionnels gérés par une entreprise.</p></details>
+<details><summary>Pourquoi choisir Big View comme agence GEO à Paris, Nantes, Rennes, Montpellier, Toulouse ou Marseille ?</summary><p>Parce que vous travaillez avec des experts seniors de 10 à 21 ans d'expérience, présents dans les six villes, sans junior sur votre compte. Nous facturons du temps d'expert (680 € HT par jour, accompagnements dès 450 € HT par mois sur devis, en moyenne 10 % moins cher que la plupart des agences) avec 0 % de commission sur vos budgets média. Nous sommes Google Partner et Microsoft Advertising Partner, et nous disposons d'un outil interne de suivi de visibilité dans les IA, GEO Share of Voice.</p></details>
+
+<div class="dark">
+<h2>Où en est votre marque dans les réponses de Gemini ?</h2>
+<p>On mesure votre visibilité dans les IA sur vos requêtes clés et on vous remet un plan priorisé. Le premier échange est un audit gratuit, sans engagement.</p>
+<p><a class="btn" href="https://big-view.fr/contact/?source=gemini-personal-intelligence">Demander mon audit gratuit</a></p>
+<p class="slogan">L'IA accélère, l'expérience pilote</p>
+</div>
+
+<p>À lire aussi : <a href="https://big-view.fr/agence-geo/">notre accompagnement GEO</a>, <a href="https://big-view.fr/agence-geo/audit-visibilite-ia/">l'audit de visibilité IA</a>, <a href="https://big-view.fr/agence-geo/contenu-citable/">le contenu citable</a>, <a href="https://big-view.fr/commerce-agentique-agents-ia-deja-la/">le commerce agentique</a>.</p>
+
+<h2>Sources</h2>
+<ul class="src">
+<li>Google, « Personal Intelligence: Connecting Gemini to Google apps », Josh Woodward, 14 janvier 2026 : <a href="https://blog.google/innovation-and-ai/products/gemini-app/personal-intelligence/">blog.google</a></li>
+<li>CNBC, « Google launches Personal Intelligence feature in Gemini app », 14 janvier 2026 : <a href="https://www.cnbc.com/2026/01/14/google-launches-personal-intelligence-in-gemini-app-challenging-apple.html">cnbc.com</a></li>
+<li>TechCrunch, 14 janvier 2026 : <a href="https://techcrunch.com/2026/01/14/geminis-new-beta-feature-provides-proactive-responses-based-on-your-photos-emails-and-more">techcrunch.com</a></li>
+<li>MacRumors, ouverture aux utilisateurs gratuits américains, 17 mars 2026 : <a href="https://www.macrumors.com/2026/03/17/gemini-personal-intelligence/">macrumors.com</a></li>
+<li>Notebookcheck, extension à l'Inde, avril 2026 : <a href="https://www.notebookcheck.net/Google-expands-Gemini-s-Personal-Intelligence-to-India.1274073.0.html">notebookcheck.net</a></li>
+<li>9to5Google, déploiement mondial hors Europe, 14 avril 2026 : <a href="https://9to5google.com/2026/04/14/gemini-personal-intelligence-global/">9to5google.com</a></li>
+</ul>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BlogPosting","headline":"Gemini Personal Intelligence : ce que l'IA personnelle de Google change pour votre marque","datePublished":"2026-10-08","author":{"@type":"Person","name":"Florent Buil","jobTitle":"Fondateur de Big View"},"publisher":{"@type":"Organization","name":"Big View","url":"https://big-view.fr/"},"inLanguage":"fr-FR","about":["Gemini","Personal Intelligence","GEO"]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Qu'est-ce que Personal Intelligence dans Gemini ?","acceptedAnswer":{"@type":"Answer","text":"Personal Intelligence est une option de Gemini, l'assistant IA de Google, qui permet de relier l'assistant à Gmail, Google Photos, YouTube et la recherche Google de l'utilisateur. Gemini s'appuie alors sur ces contenus pour personnaliser ses réponses. La fonction est désactivée par défaut et l'utilisateur choisit les applications reliées."}},{"@type":"Question","name":"Personal Intelligence est-elle disponible en France ?","acceptedAnswer":{"@type":"Answer","text":"Pas à notre connaissance au 8 octobre 2026. La fonction a été lancée aux États-Unis le 14 janvier 2026, ouverte aux utilisateurs gratuits américains en mars 2026, puis déployée en Inde et dans d'autres pays en avril 2026. Selon 9to5Google, ce déploiement excluait l'Europe. Google n'a pas communiqué de date pour la France."}},{"@type":"Question","name":"Google utilise-t-il mes e-mails pour entraîner Gemini ?","acceptedAnswer":{"@type":"Answer","text":"Selon Google, Gemini n'est pas entraîné directement sur la boîte Gmail ni sur la photothèque Google Photos. L'entraînement porte sur des informations limitées, comme les requêtes et les réponses du modèle. L'utilisateur peut désactiver Personal Intelligence ou déconnecter une application à tout moment."}},{"@type":"Question","name":"Quel impact Personal Intelligence a-t-elle sur le GEO ?","acceptedAnswer":{"@type":"Answer","text":"Le GEO (Generative Engine Optimization) vise à faire citer une marque dans les réponses des IA. Avec Personal Intelligence, ces réponses dépendent aussi de l'historique de chaque utilisateur : e-mails reçus, vidéos vues, recherches passées. Le contenu public reste la base, mais les e-mails clients, YouTube et la cohérence des informations de marque prennent plus de poids."}},{"@type":"Question","name":"Comment mesurer sa visibilité dans Gemini si les réponses sont personnalisées ?","acceptedAnswer":{"@type":"Answer","text":"On mesure d'abord la réponse sans historique personnel, sur un panel fixe de requêtes et sur plusieurs IA, pour obtenir une base comparable dans le temps. On la complète ensuite par ses propres données : trafic issu des assistants IA dans l'analytics, demandes entrantes qui citent une IA, conversions associées."}},{"@type":"Question","name":"Personal Intelligence fonctionne-t-elle avec un compte Google Workspace ?","acceptedAnswer":{"@type":"Answer","text":"Non, d'après les informations publiées au lancement : la fonction est réservée aux comptes Google personnels. Elle ne concerne donc pas les comptes professionnels gérés par une entreprise."}},{"@type":"Question","name":"Pourquoi choisir Big View comme agence GEO à Paris, Nantes, Rennes, Montpellier, Toulouse ou Marseille ?","acceptedAnswer":{"@type":"Answer","text":"Parce que vous travaillez avec des experts seniors de 10 à 21 ans d'expérience, présents dans les six villes, sans junior sur votre compte. Nous facturons du temps d'expert (680 € HT par jour, accompagnements dès 450 € HT par mois sur devis, en moyenne 10 % moins cher que la plupart des agences) avec 0 % de commission sur vos budgets média. Nous sommes Google Partner et Microsoft Advertising Partner, et nous disposons d'un outil interne de suivi de visibilité dans les IA, GEO Share of Voice."}}]}]}</script>
+</div>
+<!-- /wp:html -->
