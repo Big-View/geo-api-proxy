@@ -17,7 +17,7 @@ Un passage = **au plus un article rédigé** + tous les articles déposés dans 
 2. Test d'accès : `GET https://big-view.fr/wp-json/wp/v2/users/me`. Échec → s'arrêter et rapporter (URL, code HTTP, `code`/`message`), sans identifiant.
 
 ## Étape 1 : articles déposés dans Google Drive (prioritaire)
-Dossier « Big View – Articles à mettre en brouillon » (id `1JbMdwJYWEkhNPA403YWlkk_HxDlA5-kO`) et son sous-dossier « Générés par la routine ».
+Dossier « Big View – Articles à mettre en brouillon » (id `1JbMdwJYWEkhNPA403YWlkk_HxDlA5-kO`). Ignorer le sous-dossier « Générés par la routine » (archives éventuelles).
 Pour chaque `.html` :
 - Télécharger. S'il existe un `.json` de même nom, il fait foi ; sinon déduire : titre = H1, slug = titre simplifié (ou fin de `mainEntityOfPage`), catégories GEO 133 et/ou IA 21, titre SEO et meta description (voir étape 4).
 - Appliquer les contrôles de l'étape 3 (sans réécrire l'article : signaler les écarts dans le rapport).
@@ -53,12 +53,12 @@ Lire les titres des 12 derniers articles (`GET /wp-json/wp/v2/posts?per_page=12&
   10. JSON-LD : Article (headline, datePublished, dateModified, author Florent Buil, publisher Big View, `mainEntityOfPage` = permalien, `description` = meta description), FAQPage (identique à la FAQ), BreadcrumbList.
 - **Pas de H1** : le gabarit des articles affiche déjà le titre.
 - Permalien : WordPress préfixe l'URL avec la catégorie d'ID le plus bas (avec GEO 133 + IA 21 → `/ia/<slug>/`). Utiliser ce permalien dans le JSON-LD.
-- Enregistrer `<slug>.html` et `<slug>.json` dans « Générés par la routine » (créer le sous-dossier si besoin). Si Drive est indisponible, continuer et le signaler.
+- Écrire `<slug>.html` et `<slug>.json` dans un dossier de travail local. Pas de copie dans Drive : le connecteur ne sait pas envoyer un fichier local, et recopier l'article dans l'appel risque une archive différente du brouillon. Le brouillon WordPress fait foi.
 
 ## Étape 3 : contrôles avant mise en brouillon
 - Texte : zéro « BigView »/« bigview.fr », zéro tiret cadratin, slogan exact, aucun H1, chaque chiffre issu des faits autorisés ou d'une source citée, chaque lien externe en `rel="nofollow noopener"`.
 - Le script `publish_draft.py --dry-run` vérifie déjà la marque, le tiret cadratin, le slogan et le H1 (champ `etapes`) et prépare `content.html` avec les infographies rendues.
-- Rendu : `node scripts/check_render.mjs <workdir>/content.html <workdir>` → aucun `debordement` en desktop 1440 px ni en mobile 390 px, `h1` = 0, `imagesCassees` vide. Regarder les deux captures `apercu-*.png` et corriger toute section cassée avant d'envoyer.
+- Rendu : `node scripts/check_render.mjs <workdir>/content.html <workdir>`, à relancer après la création du brouillon avec le `content.html` du vrai envoi (images de la médiathèque) → aucun `debordement` en desktop 1440 px ni en mobile 390 px, `h1` = 0, `imagesCassees` vide. Regarder les deux captures `apercu-*.png` et corriger toute section cassée avant d'envoyer.
 
 ## Étape 4 : mise en brouillon
 - Métadonnées (`<slug>.json`) : `title`, `slug`, `categories`, `seo_title` (≤ 60 caractères, mot-clé en tête), `metadesc` (≤ 155), `focuskw`, `excerpt` (par défaut = meta description), `author` (par défaut 9 = Florent Buil), `template` (par défaut `elementor_header_footer`).
