@@ -23,21 +23,25 @@ description: Met un article HTML en BROUILLON sur big-view.fr (WordPress + Eleme
   "seo_title": "Titre SEO Yoast (≤ 60 caractères)",
   "metadesc": "Meta description Yoast (≤ 155 caractères)",
   "focuskw": "mot-clé principal (optionnel)",
+  "author": 9,
   "template": "elementor_header_footer"
 }
 ```
-- Valeurs par défaut : titre = H1 du HTML ; extrait = `description` du JSON-LD Article s'il existe ; gabarit `elementor_header_footer`. Catégories connues : **GEO = 133, IA = 21** (sinon `GET /wp-json/wp/v2/categories?search=…`).
+- Valeurs par défaut : titre = H1 du HTML ; extrait = meta description ; auteur = 9 (Florent Buil, pour que l'auteur WordPress et Yoast correspondent à la byline) ; gabarit `elementor_header_footer`. Catégories connues : **GEO = 133, IA = 21** (sinon `GET /wp-json/wp/v2/categories?search=…`).
 - Si le titre SEO ou la meta description ne sont pas fournis, les rédiger (voix Big View, longueurs ci-dessus) et le dire dans le rapport. Ne demander à l'utilisateur que ce qui ne peut pas être déduit (en pratique : le slug ou les catégories s'ils sont ambigus).
 
 ## 2. Exécuter
 ```bash
 S=<dossier de ce skill>/scripts
 python3 $S/publish_draft.py article.html article.json --dry-run   # contrôle à blanc, rien n'est envoyé
+node $S/check_render.mjs <workdir>/content.html <workdir>          # rendu 1440/390 px : débordement, H1, images
 python3 $S/publish_draft.py article.html article.json             # création du brouillon
 ```
 Le script affiche un rapport JSON. Codes retour : `0` brouillon créé · `2` API non connectée · `3` slug déjà pris (rien créé) · `1` autre erreur.
 
-Rendu des infographies : Chromium/Playwright s'il est présent (polices Poppins/Roboto), sinon `cairosvg` (installé automatiquement par pip). Si aucun ne marche, les SVG restent inline et le rapport le signale : le prévenir que l'article ne devra pas être ouvert dans Elementor.
+Pour la routine planifiée (rédaction, choix du sujet, règles de marque), suivre `ROUTINE.md`.
+
+Rendu des infographies (envoyées en WebP) : Chromium/Playwright s'il est présent (polices Poppins/Roboto), sinon `cairosvg` (installé automatiquement par pip). Si aucun ne marche, les SVG restent inline et le rapport le signale : le prévenir que l'article ne devra pas être ouvert dans Elementor.
 
 ## 3. Si l'API répond « non connecté » (code 2)
 S'arrêter. Indiquer exactement : l'URL testée (`GET https://big-view.fr/wp-json/wp/v2/users/me?context=edit`), le code HTTP, et les champs `code`/`message` renvoyés par WordPress (ex. `rest_not_logged_in`). Causes probables à citer : secret « WordPress Big View » absent de cet environnement, domaine big-view.fr non autorisé dans l'accès réseau, ou mot de passe d'application révoqué. N'afficher aucun identifiant.
@@ -48,10 +52,12 @@ S'arrêter. Indiquer exactement : l'URL testée (`GET https://big-view.fr/wp-jso
 | `GET /users/me` d'abord | Vérifie l'accès ; rapporte le compte (nom, rôle) et l'absence éventuelle du droit `unfiltered_html`. |
 | Vérifie slug libre + catégories | Pas de doublon, pas de catégorie fantôme. |
 | Retire le `<h1>` du HTML | Le gabarit affiche déjà le titre : sinon H1 en double. |
-| Chaque `<svg>` → PNG 2x envoyé dans la médiathèque (texte alternatif = `<title>` du SVG), remplacé par `<img>` | Elementor supprime les SVG inline quand on ouvre l'article dans son éditeur ; une image de médiathèque survit, comme sur les autres articles du blog. |
+| Chaque `<svg>` → image 2x (WebP) envoyée dans la médiathèque (texte alternatif = `<title>` du SVG), remplacé par `<img>` | Elementor supprime les SVG inline quand on ouvre l'article dans son éditeur ; une image de médiathèque survit, comme sur les autres articles du blog. |
 | Contenu dans `<!-- wp:html -->` | Bloc HTML personnalisé, non retouché par WordPress. |
 | `meta._elementor_edit_mode = ""` | Sinon Elementor sert en ligne une version en cache de l'ancien rendu (infographies et JSON-LD absents en ligne alors que visibles dans l'éditeur). WordPress rend alors le contenu ; en-tête et pied de page restent. |
 | Yoast : `_yoast_wpseo_title`, `_yoast_wpseo_metadesc`, `_yoast_wpseo_focuskw` | Champs exposés par l'API du site. |
+| Contrôles marque (BigView, tiret cadratin, slogan exact) | Règles de `bigview-page-creation`, signalées dans `etapes`. |
+| Auteur 9 (Florent Buil) | Sinon l'article est attribué au compte de l'API (« Georges ») et Yoast le déclare comme auteur. |
 | Relecture `context=edit` | Statut draft, contenu identique à l'envoi, mode Elementor vide, Yoast enregistré, `mainEntityOfPage` du JSON-LD cohérent avec le permalien. |
 
 ## 4. Rapport à l'utilisateur (français, sans identifiant)

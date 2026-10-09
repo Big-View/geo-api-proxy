@@ -22,7 +22,9 @@ import tempfile
 
 API = "https://big-view.fr/wp-json/wp/v2"
 HERE = os.path.dirname(os.path.abspath(__file__))
-REQUIRED = ["title", "slug", "categories", "excerpt", "seo_title", "metadesc"]
+REQUIRED = ["title", "slug", "categories", "seo_title", "metadesc"]
+AUTHOR_FLORENT = 9  # utilisateur WordPress « Florent Buil »
+SLOGAN = "L'IA accélère, l'expérience pilote"
 
 
 def curl(method, url, data_file=None, headers=None, binary=None):
@@ -96,6 +98,8 @@ def main():
     if missing:
         fail(report, 1, f"Champs manquants dans {os.path.basename(a.meta)} : {missing}")
     meta.setdefault("template", "elementor_header_footer")
+    meta.setdefault("excerpt", meta["metadesc"])
+    meta.setdefault("author", AUTHOR_FLORENT)
     if len(meta["seo_title"]) > 60 or len(meta["metadesc"]) > 155:
         report["etapes"].append(f"ATTENTION longueurs Yoast : titre {len(meta['seo_title'])}/60, meta {len(meta['metadesc'])}/155")
 
@@ -142,18 +146,26 @@ def main():
             report["etapes"].append("ATTENTION : aucun moteur de rendu SVG disponible, infographies laissées en SVG inline")
             images = []
             break
-        img = {"alt": alt, "png": png_path, "w": dims["width"], "h": dims["height"]}
+        up_path, up_type = png_path, "image/png"
+        try:
+            from PIL import Image
+            up_path = png_path[:-4] + ".webp"
+            Image.open(png_path).save(up_path, "WEBP", quality=90, method=6)
+            up_type = "image/webp"
+        except Exception:
+            up_path, up_type = png_path, "image/png"
+        img = {"alt": alt, "png": up_path, "w": dims["width"], "h": dims["height"]}
         if not a.dry_run:
-            code, media = curl("POST", f"{API}/media", binary=png_path, headers=[
-                "Content-Type: image/png",
-                f"Content-Disposition: attachment; filename={os.path.basename(png_path)}"])
+            code, media = curl("POST", f"{API}/media", binary=up_path, headers=[
+                f"Content-Type: {up_type}",
+                f"Content-Disposition: attachment; filename={os.path.basename(up_path)}"])
             if code not in (200, 201):
                 fail(report, 1, f"Upload infographie {i} → HTTP {code} : {media}")
             post_json(f"{API}/media/{media['id']}", {"alt_text": alt, "title": alt}, workdir)
             img.update(id=media["id"], url=media["source_url"])
         images.append(img)
     for img, m in reversed(list(zip(images, svgs))):
-        url = img.get("url", "IMAGE_DRY_RUN")
+        url = img.get("url") or ("file://" + img["png"])
         tag = (f'<img src="{url}" alt="{htmllib.escape(img["alt"])}" width="{img["w"]}" '
                f'height="{img["h"]}" loading="lazy" decoding="async" style="width:100%;height:auto;border-radius:20px">')
         src = src[:m.start()] + tag + src[m.end():]
@@ -161,6 +173,14 @@ def main():
 
     content = "<!-- wp:html -->\n" + src + "\n<!-- /wp:html -->"
     open(os.path.join(workdir, "content.html"), "w", encoding="utf-8").write(content)
+    visible = re.sub(r"<(script|style)\b.*?</\1>", "", content, flags=re.S)
+    if re.search(r"\bBig[Vv]iew\b|bigview\.fr", visible):
+        report["etapes"].append("ATTENTION marque : « BigView » ou « bigview.fr » trouvé (écrire « Big View » / « big-view.fr »)")
+    if "\u2014" in visible:
+        report["etapes"].append(f"ATTENTION style : {visible.count(chr(0x2014))} tiret(s) cadratin(s) à remplacer")
+    sig = re.findall(r"L[’']IA accélère[^<]*", visible)
+    if any(x.replace("’", "'").strip() != SLOGAN for x in sig):
+        report["etapes"].append(f"ATTENTION slogan non exact : {sig}")
     report["controles_contenu"] = {
         "img": content.count("<img"), "svg_restants": content.count("<svg"),
         "json_ld": content.count("application/ld+json"), "h1": content.count("<h1")}
@@ -175,7 +195,7 @@ def main():
     payload = {
         "title": meta["title"], "slug": meta["slug"], "status": "draft",
         "categories": meta["categories"], "excerpt": meta["excerpt"],
-        "template": meta["template"], "content": content,
+        "template": meta["template"], "content": content, "author": meta["author"],
         "meta": {"_elementor_edit_mode": "", "_yoast_wpseo_title": meta["seo_title"],
                  "_yoast_wpseo_metadesc": meta["metadesc"]},
     }
@@ -190,7 +210,7 @@ def main():
     code, chk = curl("GET", f"{API}/posts/{pid}?context=edit")
     raw, rendered, m = chk["content"]["raw"], chk["content"]["rendered"], chk["meta"]
     report["brouillon"] = {
-        "id": pid, "statut": chk["status"],
+        "id": pid, "statut": chk["status"], "auteur_id": chk.get("author"),
         "edition": f"https://big-view.fr/wp-admin/post.php?post={pid}&action=edit",
         "permalien_prevu": chk.get("permalink_template", "").replace("%postname%", meta["slug"]) or chk.get("link"),
         "contenu_identique": raw == content,
@@ -200,7 +220,7 @@ def main():
     }
     b = report["brouillon"]
     report["ok"] = (b["statut"] == "draft" and b["contenu_identique"] and b["elementor_edit_mode"] == ""
-                    and b["yoast_titre"] == meta["seo_title"])
+                    and b["yoast_titre"] == meta["seo_title"] and b["auteur_id"] == meta["author"])
     # Le JSON-LD doit pointer vers le vrai permalien
     ld_urls = set(re.findall(r'"mainEntityOfPage":\s*"([^"]+)"', content))
     if ld_urls and b["permalien_prevu"] and b["permalien_prevu"] not in ld_urls:
