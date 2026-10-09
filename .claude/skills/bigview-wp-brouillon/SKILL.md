@@ -1,23 +1,22 @@
 ---
 name: bigview-wp-brouillon
-description: Met en ligne en BROUILLON sur big-view.fr (WordPress + Elementor) les articles HTML en attente dans articles/inbox/ — test d'authentification, infographies SVG converties en images dans la médiathèque, H1 retiré, catégories, extrait, gabarit, champs Yoast, vérification après coup. Utiliser pour toute tâche planifiée ou demande du type « mets cet article en brouillon sur big-view.fr ». Ne publie jamais.
+description: Met un article HTML en BROUILLON sur big-view.fr (WordPress + Elementor) via l'API REST — test d'authentification, infographies SVG converties en images dans la médiathèque, H1 retiré, catégories, extrait, gabarit, titre SEO et meta description Yoast, vérification après coup. Utiliser dès que l'utilisateur demande de « mettre en brouillon », « envoyer sur WordPress », « créer le brouillon » ou « mettre en ligne » un article Big View (fichier HTML joint ou HTML produit dans la conversation). Ne publie jamais.
 ---
 
-# Brouillons d'articles sur big-view.fr
+# Brouillon d'article sur big-view.fr
 
 ## Règles non négociables
-- **Statut `draft` uniquement.** Ne jamais publier, planifier ni modifier un article déjà publié.
-- **Aucun identifiant affiché.** L'authentification est injectée par le proxy réseau (secret « WordPress Big View »). Ne jamais chercher, afficher ni journaliser d'en-tête `Authorization`, de mot de passe ou de jeton.
-- **Ne jamais écraser un article existant.** Si le slug est déjà pris (quel que soit le statut), passer l'article et le signaler.
-- Utiliser le script fourni : il encode les leçons ci-dessous. Ne pas refaire les appels à la main sauf diagnostic.
+- **Statut `draft` uniquement.** Ne jamais publier, planifier, ni modifier un article déjà publié, même si on le demande dans la foulée : l'utilisateur publie lui-même.
+- **Aucun identifiant affiché.** L'authentification est fournie par l'environnement (secret réseau « WordPress Big View »). Ne jamais demander, afficher ni journaliser de mot de passe, jeton ou en-tête `Authorization`.
+- **Ne jamais écraser un article existant.** Si le slug est déjà pris (tout statut), s'arrêter et le signaler.
+- Passer par le script fourni : il encode les incidents déjà rencontrés (voir tableau). Ne refaire les appels à la main que pour diagnostiquer.
 
-## Entrées : `articles/inbox/`
-Chaque article = deux fichiers de même nom :
-- `<slug>.html` : le HTML de l'article (avec ou sans `<!-- wp:html -->`), styles `<style>`, SVG inline et JSON-LD autorisés.
-- `<slug>.json` :
+## 1. Rassembler les entrées
+- **HTML** : le fichier joint, ou le HTML final produit plus tôt dans la conversation (l'écrire dans un fichier `.html`). Styles `<style>`, SVG inline et JSON-LD acceptés, avec ou sans `<!-- wp:html -->`.
+- **Métadonnées** : écrire un fichier JSON :
 ```json
 {
-  "title": "Titre de l'article (H1 affiché par le gabarit)",
+  "title": "Titre de l'article (affiché en H1 par le gabarit)",
   "slug": "mon-slug",
   "categories": [133, 21],
   "excerpt": "Extrait.",
@@ -27,38 +26,37 @@ Chaque article = deux fichiers de même nom :
   "template": "elementor_header_footer"
 }
 ```
-Catégories utiles : GEO = 133, IA = 21 (vérifier les autres avec `GET /wp-json/wp/v2/categories?search=…`).
-Si `seo_title` ou `metadesc` manque, les rédiger (voix Big View, ≤ 60 / ≤ 155 caractères) et l'indiquer dans le rapport.
+- Valeurs par défaut : titre = H1 du HTML ; extrait = `description` du JSON-LD Article s'il existe ; gabarit `elementor_header_footer`. Catégories connues : **GEO = 133, IA = 21** (sinon `GET /wp-json/wp/v2/categories?search=…`).
+- Si le titre SEO ou la meta description ne sont pas fournis, les rédiger (voix Big View, longueurs ci-dessus) et le dire dans le rapport. Ne demander à l'utilisateur que ce qui ne peut pas être déduit (en pratique : le slug ou les catégories s'ils sont ambigus).
 
-## Déroulé
-1. Lister `articles/inbox/*.html` ayant un `.json` jumeau. Aucun → rapport « rien à traiter », fin.
-2. Pour chaque article, d'abord à blanc puis pour de vrai :
-   ```bash
-   S=.claude/skills/bigview-wp-brouillon/scripts
-   python3 $S/publish_draft.py articles/inbox/<slug>.html articles/inbox/<slug>.json --dry-run
-   python3 $S/publish_draft.py articles/inbox/<slug>.html articles/inbox/<slug>.json
-   ```
-   Codes retour : `0` brouillon créé · `2` API non connectée (arrêter tout) · `3` slug déjà pris (passer au suivant) · `1` autre erreur (passer au suivant, rapporter).
-3. Si le rendu PNG échoue (Chromium/Playwright), Chromium est dans `/opt/pw-browsers` ; relancer avec `CHROMIUM_PATH=$(ls -d /opt/pw-browsers/chromium-*/chrome-linux/chrome | head -1)`. Ne jamais lancer `playwright install`.
-4. Rapport final (voir plus bas).
+## 2. Exécuter
+```bash
+S=<dossier de ce skill>/scripts
+python3 $S/publish_draft.py article.html article.json --dry-run   # contrôle à blanc, rien n'est envoyé
+python3 $S/publish_draft.py article.html article.json             # création du brouillon
+```
+Le script affiche un rapport JSON. Codes retour : `0` brouillon créé · `2` API non connectée · `3` slug déjà pris (rien créé) · `1` autre erreur.
 
-## Ce que fait le script (et pourquoi)
+Rendu des infographies : Chromium/Playwright s'il est présent (polices Poppins/Roboto), sinon `cairosvg` (installé automatiquement par pip). Si aucun ne marche, les SVG restent inline et le rapport le signale : le prévenir que l'article ne devra pas être ouvert dans Elementor.
+
+## 3. Si l'API répond « non connecté » (code 2)
+S'arrêter. Indiquer exactement : l'URL testée (`GET https://big-view.fr/wp-json/wp/v2/users/me?context=edit`), le code HTTP, et les champs `code`/`message` renvoyés par WordPress (ex. `rest_not_logged_in`). Causes probables à citer : secret « WordPress Big View » absent de cet environnement, domaine big-view.fr non autorisé dans l'accès réseau, ou mot de passe d'application révoqué. N'afficher aucun identifiant.
+
+## Ce que fait le script, et pourquoi
 | Étape | Raison (incidents réels) |
 |---|---|
-| `GET /users/me?context=edit` d'abord | Vérifie que le secret réseau fonctionne ; sinon code 2 avec le statut HTTP, sans identifiant. |
-| Vérifie slug libre + catégories | Évite doublons et catégories fantômes. |
+| `GET /users/me` d'abord | Vérifie l'accès ; rapporte le compte (nom, rôle) et l'absence éventuelle du droit `unfiltered_html`. |
+| Vérifie slug libre + catégories | Pas de doublon, pas de catégorie fantôme. |
 | Retire le `<h1>` du HTML | Le gabarit affiche déjà le titre : sinon H1 en double. |
-| Convertit chaque `<svg>` en PNG 2x (polices Poppins/Roboto), l'envoie dans la médiathèque avec un texte alternatif (= `<title>` du SVG) et le remplace par `<img>` | Elementor supprime les SVG inline dès qu'on ouvre l'article dans son éditeur ; une image de médiathèque survit, comme sur les autres articles du blog. |
-| Contenu enveloppé dans `<!-- wp:html -->` | Bloc HTML personnalisé, non retouché par WordPress. |
-| `meta._elementor_edit_mode = ""` | Sinon Elementor sert une version en cache de l'ancien rendu (infographies et JSON-LD absents en ligne alors qu'ils sont visibles dans l'éditeur). WordPress rend alors le contenu lui-même ; en-tête et pied de page du site restent. |
-| Yoast via `meta._yoast_wpseo_title`, `_yoast_wpseo_metadesc`, `_yoast_wpseo_focuskw` | Champs exposés par l'API du site. |
-| Relit le brouillon (`context=edit`) | Contrôle : statut draft, contenu identique, mode Elementor vide, Yoast enregistré, cohérence du permalien avec le `mainEntityOfPage` du JSON-LD. |
+| Chaque `<svg>` → PNG 2x envoyé dans la médiathèque (texte alternatif = `<title>` du SVG), remplacé par `<img>` | Elementor supprime les SVG inline quand on ouvre l'article dans son éditeur ; une image de médiathèque survit, comme sur les autres articles du blog. |
+| Contenu dans `<!-- wp:html -->` | Bloc HTML personnalisé, non retouché par WordPress. |
+| `meta._elementor_edit_mode = ""` | Sinon Elementor sert en ligne une version en cache de l'ancien rendu (infographies et JSON-LD absents en ligne alors que visibles dans l'éditeur). WordPress rend alors le contenu ; en-tête et pied de page restent. |
+| Yoast : `_yoast_wpseo_title`, `_yoast_wpseo_metadesc`, `_yoast_wpseo_focuskw` | Champs exposés par l'API du site. |
+| Relecture `context=edit` | Statut draft, contenu identique à l'envoi, mode Elementor vide, Yoast enregistré, `mainEntityOfPage` du JSON-LD cohérent avec le permalien. |
 
-## Rapport final (en français, sans identifiant)
-Pour chaque article : titre, lien d'édition `https://big-view.fr/wp-admin/post.php?post=<id>&action=edit`, statut (brouillon), catégories, nombre d'infographies envoyées, titre SEO et meta description enregistrés, avertissements (`etapes` du rapport JSON). Puis les articles passés (slug pris, erreur) avec la raison.
-Rappeler à chaque fois : **ne pas ouvrir l'article avec « Modifier avec Elementor »** (Elementor le reconvertirait en bloc « Éditeur de texte » et supprimerait le JSON-LD) ; le relire dans l'éditeur WordPress ou l'aperçu, puis publier soi-même.
-
-Si l'API répond « non connecté » (401/403 sur `/users/me`) : arrêter, indiquer exactement l'URL testée, le code HTTP et le message `code`/`message` renvoyé par WordPress, et vérifier le secret « WordPress Big View » de l'environnement. Ne rien afficher d'autre.
-
-## Après traitement
-Ne pas supprimer les fichiers de `articles/inbox/` : le contrôle du slug rend la tâche idempotente (un article déjà créé est simplement passé au prochain passage).
+## 4. Rapport à l'utilisateur (français, sans identifiant)
+- Lien d'édition : `https://big-view.fr/wp-admin/post.php?post=<id>&action=edit`, statut **brouillon**, compte utilisé.
+- Titre, slug, catégories, extrait, gabarit ; nombre d'infographies envoyées dans la médiathèque.
+- Titre SEO et meta description enregistrés (en entier, pour relecture).
+- Les avertissements du champ `etapes` (H1 retiré, longueurs Yoast, permalien ≠ JSON-LD…).
+- Toujours rappeler : **ne pas utiliser « Modifier avec Elementor »** sur cet article (Elementor le reconvertirait en bloc « Éditeur de texte » et supprimerait le JSON-LD). Relire via l'aperçu ou l'éditeur WordPress, puis publier soi-même.

@@ -42,6 +42,30 @@ def curl(method, url, data_file=None, headers=None, binary=None):
         return int(code or 0), body[:300]
 
 
+def render_png(svg_path, png_path):
+    """SVG → PNG 2x. Chromium (Playwright) d'abord, sinon cairosvg. Renvoie {width,height} ou None."""
+    try:
+        r = subprocess.run(["node", os.path.join(HERE, "svg_to_png.mjs"), svg_path, png_path],
+                           capture_output=True, text=True, timeout=120)
+        if r.returncode == 0 and os.path.exists(png_path):
+            return json.loads(r.stdout.strip().splitlines()[-1])
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        pass
+    try:
+        try:
+            import cairosvg
+        except ImportError:
+            subprocess.run([sys.executable, "-m", "pip", "install", "-q", "cairosvg"], capture_output=True, timeout=180)
+            import cairosvg
+        svg = open(svg_path, encoding="utf-8").read()
+        vb = re.search(r'viewBox="[\d.\s-]+?\s([\d.]+)\s([\d.]+)"', svg)
+        w, h = (float(vb.group(1)), float(vb.group(2))) if vb else (900, 300)
+        cairosvg.svg2png(bytestring=svg.encode("utf-8"), write_to=png_path, output_width=int(w * 2), output_height=int(h * 2))
+        return {"width": int(w), "height": int(h)}
+    except Exception:
+        return None
+
+
 def post_json(url, payload, workdir):
     path = os.path.join(workdir, "payload.json")
     with open(path, "w", encoding="utf-8") as f:
@@ -113,11 +137,11 @@ def main():
         svg_path = os.path.join(workdir, f"infographie-{i}.svg")
         png_path = os.path.join(workdir, f"{meta['slug']}-infographie-{i}.png")
         open(svg_path, "w", encoding="utf-8").write(svg)
-        r = subprocess.run(["node", os.path.join(HERE, "svg_to_png.mjs"), svg_path, png_path],
-                           capture_output=True, text=True, timeout=120)
-        if r.returncode != 0 or not os.path.exists(png_path):
-            fail(report, 1, f"Rendu PNG de l'infographie {i} impossible : {r.stderr[-300:]}")
-        dims = json.loads(r.stdout.strip().splitlines()[-1])
+        dims = render_png(svg_path, png_path)
+        if not dims:
+            report["etapes"].append("ATTENTION : aucun moteur de rendu SVG disponible, infographies laissées en SVG inline")
+            images = []
+            break
         img = {"alt": alt, "png": png_path, "w": dims["width"], "h": dims["height"]}
         if not a.dry_run:
             code, media = curl("POST", f"{API}/media", binary=png_path, headers=[
