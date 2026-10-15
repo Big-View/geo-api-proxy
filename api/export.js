@@ -11,12 +11,14 @@
  *   GOOGLE_SLIDES_FOLDER_ID      dossier (Drive partagé conseillé) où créer la présentation
  *   GOOGLE_IMPERSONATE           utilisateur Workspace à emprunter (délégation domaine), optionnel
  *   GOOGLE_SLIDES_SHARE_WITH     e-mails (séparés par des virgules) à qui donner l'accès en écriture
+ *                                (défaut : hello@big-view.fr)
  *   Il faut l'un des deux : un dossier de Drive partagé, ou la délégation domaine, car un compte
  *   de service n'a pas d'espace de stockage propre.
  */
 const crypto = require('crypto');
 const PDFDocument = require('pdfkit');
 
+const DEFAULT_SHARE_WITH = 'hello@big-view.fr';
 const SENTIMENT_FR = { positive: 'Positif', neutral: 'Neutre', negative: 'Négatif' };
 const GREEN = '#04D99D', INK = '#131313', MUTED = '#7A7A7A', LINE = '#E6E6E6';
 
@@ -493,7 +495,7 @@ async function createSlides(report, shareWith) {
 
   await gapi(token, 'POST', `https://slides.googleapis.com/v1/presentations/${presentationId}:batchUpdate`, { requests: reqs });
 
-  const emails = [...String(shareWith || '').split(','), ...String(process.env.GOOGLE_SLIDES_SHARE_WITH || '').split(',')]
+  const emails = [...String(shareWith || '').split(','), ...String(process.env.GOOGLE_SLIDES_SHARE_WITH || DEFAULT_SHARE_WITH).split(',')]
     .map(e => e.trim()).filter(e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));
   const shared = [];
   for (const email of [...new Set(emails)]) {
