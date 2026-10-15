@@ -1,5 +1,5 @@
 /**
- * API PROXY MULTI-CHANNEL - Version 2.4
+ * API PROXY MULTI-CHANNEL - Version 2.5
  * Routes :
  *   POST /api/llm      → interroge un canal (openai, anthropic, google, perplexity, google_overviews)
  *   POST /api/suggest  → suggère des prompts (brand, sector, angle) via Claude
@@ -7,11 +7,19 @@
  *   GET  /api/history  → lit l'historique (?brand=&days=&limit=)
  *   GET  /api/sov      → Share of Voice agrégé depuis l'historique (?brand=&days=&provider=)
  *   POST /api/sov      → Share of Voice agrégé sur des lignes fournies ({ brand, rows[] })
+ *   GET  /api/export   → export ?format=csv|pdf|slides (&brand=&days=&provider=) depuis l'historique
+ *   POST /api/export   → export { format, brand, rows[] } sur des lignes fournies
  *   GET  /api/health   → état de la config
  *
  * Marques (champ `brands`) : chaînes ou objets { name, aliases?: [], domain? }.
  *   Détection par mot entier, insensible casse/accents, tolérante aux séparateurs
  *   (« Big View » = « BigView » = « big-view »). Le domaine sert aux citations.
+ *
+ * Sentiment : /api/llm analyse le ton employé pour chaque marque citée (Claude, sortie JSON
+ *   structurée). Désactivable par requête avec `sentiment: false`. Modèle : SENTIMENT_MODEL.
+ * Historique : colonnes `ranks` et `sentiments` (jsonb), voir supabase/migrations/.
+ * Google Slides : GOOGLE_SERVICE_ACCOUNT_JSON (+ GOOGLE_SLIDES_FOLDER_ID, GOOGLE_IMPERSONATE,
+ *   GOOGLE_SLIDES_SHARE_WITH optionnels), voir api/export.js.
  *
  * Variables d'environnement :
  *   TEAM_TOKEN, API_KEY_OPENAI, API_KEY_ANTHROPIC, API_KEY_GOOGLE, API_KEY_PERPLEXITY
@@ -45,14 +53,16 @@ module.exports = function(app) {
         perplexity: !!process.env.API_KEY_PERPLEXITY,
         google_overviews: !!(process.env.SERPAPI_KEY || (process.env.GOOGLE_SEARCH_API_KEY && process.env.GOOGLE_SEARCH_ENGINE_ID))
       },
-      history: historyConfigured()
+      history: historyConfigured(),
+      sentiment: !!process.env.API_KEY_ANTHROPIC,
+      exports: { csv: true, pdf: true, slides: !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON }
     });
   });
 
   // ---------- LLM ----------
   app.post("/api/llm", async (req, res) => {
     if (!checkAuth(req, res)) return;
-    const { provider, query, brands, location } = req.body;
+    const { provider, query, brands, location, sentiment } = req.body;
     console.log(`📤 [DISPATCHING] Provider: ${provider}`);
 
     if (!provider) return res.status(400).json({ error: 'Bad Request', message: 'Provider parameter is required' });
@@ -70,6 +80,7 @@ module.exports = function(app) {
           return res.status(400).json({ error: 'Unknown provider', message: `Provider '${provider}' is not supported` });
       }
       enrichWithShareOfVoice(response, brands);
+      if (sentiment !== false) await enrichWithSentiment(response, query);
       console.log(`✅ [SUCCESS] ${provider}`);
       return res.status(200).json(response);
     } catch (error) {
@@ -102,6 +113,7 @@ module.exports = function(app) {
     if (!rows.length) return res.status(400).json({ error: 'Bad Request', message: 'rows[] is required' });
 
     const clean = rows.map(r => ({
+      ...historyExtras(r),
       run_id: String(r.run_id || ''),
       brand: String(r.brand || '').slice(0, 200),
       competitors: Array.isArray(r.competitors) ? r.competitors.slice(0, 20) : [],
@@ -117,7 +129,15 @@ module.exports = function(app) {
     }));
 
     try {
-      await supabase('POST', 'geo_runs', clean, { Prefer: 'return=minimal' });
+      try {
+        await supabase('POST', 'geo_runs', clean, { Prefer: 'return=minimal' });
+      } catch (e) {
+        if (!isMissingColumnError(e)) throw e;
+        // Migration rang/sentiment pas encore appliquée : on enregistre sans ces colonnes
+        console.warn("⚠️ [HISTORY] colonnes ranks/sentiments absentes, enregistrement sans");
+        await supabase('POST', 'geo_runs', clean.map(({ ranks, sentiments, ...rest }) => rest), { Prefer: 'return=minimal' });
+        return res.json({ status: 'success', saved: clean.length, warning: 'ranks/sentiments non enregistrés : appliquer la migration supabase' });
+      }
       return res.json({ status: 'success', saved: clean.length });
     } catch (error) {
       console.error("❌ [ERROR] history save:", error.message);
@@ -134,16 +154,11 @@ module.exports = function(app) {
     const limit = Math.min(parseInt(req.query.limit || '2000', 10) || 2000, 5000);
     const since = new Date(Date.now() - days * 86400000).toISOString();
 
-    const params = new URLSearchParams({
-      select: 'id,created_at,run_id,brand,competitors,sector,angle,prompt,provider,mentioned,mentions,has_ai_overview,error',
-      order: 'created_at.desc',
-      limit: String(limit),
-      created_at: `gte.${since}`
-    });
-    if (brand) params.set('brand', `eq.${brand}`);
-
     try {
-      const rows = await supabase('GET', `geo_runs?${params}`);
+      const rows = await readHistory({
+        select: 'id,created_at,run_id,brand,competitors,sector,angle,prompt,provider,mentioned,mentions,has_ai_overview,error',
+        order: 'created_at.desc', limit, since, brand
+      });
       return res.json({ status: 'success', configured: true, rows });
     } catch (error) {
       console.error("❌ [ERROR] history read:", error.message);
@@ -156,22 +171,10 @@ module.exports = function(app) {
     if (!checkAuth(req, res)) return;
     if (!historyConfigured()) return res.status(503).json({ error: 'History not configured', configured: false });
 
-    const brand = req.query.brand ? String(req.query.brand) : null;
-    const provider = req.query.provider ? String(req.query.provider) : null;
-    const days = Math.min(parseInt(req.query.days || '90', 10) || 90, 365);
-    const since = new Date(Date.now() - days * 86400000).toISOString();
-
-    const params = new URLSearchParams({
-      select: 'created_at,run_id,brand,competitors,prompt,provider,mentioned,mentions,has_ai_overview,error',
-      order: 'created_at.asc',
-      limit: '5000',
-      created_at: `gte.${since}`
-    });
-    if (brand) params.set('brand', `eq.${brand}`);
-    if (provider) params.set('provider', `eq.${provider}`);
+    const { brand, provider, days } = sovFilters(req.query);
 
     try {
-      const rows = await supabase('GET', `geo_runs?${params}`);
+      const rows = await readSovRows({ brand, provider, days });
       return res.json({ status: 'success', days, ...aggregateShareOfVoice(rows, brand) });
     } catch (error) {
       console.error("❌ [ERROR] sov:", error.message);
@@ -185,7 +188,72 @@ module.exports = function(app) {
     if (!rows.length) return res.status(400).json({ error: 'Bad Request', message: 'rows[] is required' });
     return res.json({ status: 'success', ...aggregateShareOfVoice(rows, req.body.brand || null) });
   });
+
+  // ---------- Exports CSV / PDF / Google Slides ----------
+  require('./export.js')(app, { checkAuth, historyConfigured, readSovRows, sovFilters, aggregateShareOfVoice });
 };
+
+// =====================================================
+// Lecture historique (avec repli si la migration rang/sentiment n'est pas appliquée)
+// =====================================================
+function sovFilters(q) {
+  return {
+    brand: q.brand ? String(q.brand) : null,
+    provider: q.provider ? String(q.provider) : null,
+    days: Math.min(parseInt(q.days || '90', 10) || 90, 365)
+  };
+}
+
+function isMissingColumnError(e) {
+  return /PGRST204|42703|column .* does not exist|Could not find the '.*' column/i.test(String(e && e.message));
+}
+
+async function readHistory({ select, order, limit, since, brand, provider }) {
+  const build = (sel) => {
+    const params = new URLSearchParams({ select: sel, order, limit: String(limit), created_at: `gte.${since}` });
+    if (brand) params.set('brand', `eq.${brand}`);
+    if (provider) params.set('provider', `eq.${provider}`);
+    return `geo_runs?${params}`;
+  };
+  try {
+    return await supabase('GET', build(`${select},ranks,sentiments`));
+  } catch (e) {
+    if (!isMissingColumnError(e)) throw e;
+    return supabase('GET', build(select));
+  }
+}
+
+function readSovRows({ brand, provider, days }) {
+  return readHistory({
+    select: 'created_at,run_id,brand,competitors,prompt,provider,mentioned,mentions,has_ai_overview,error',
+    order: 'created_at.asc', limit: 5000,
+    since: new Date(Date.now() - days * 86400000).toISOString(),
+    brand, provider
+  });
+}
+
+// ranks { marque: rang|null } et sentiments { marque: { label, score } } d'une ligne d'historique.
+// Acceptés tels quels, ou dérivés de brandStats (réponse brute de /api/llm).
+function historyExtras(r) {
+  const ranks = {}, sentiments = {};
+  const src = r.brandStats && typeof r.brandStats === 'object' ? r.brandStats : null;
+  if (r.ranks && typeof r.ranks === 'object') Object.assign(ranks, r.ranks);
+  else if (src) for (const [k, v] of Object.entries(src)) ranks[k] = v && v.rank != null ? v.rank : null;
+  if (r.sentiments && typeof r.sentiments === 'object') Object.assign(sentiments, r.sentiments);
+  else if (src) for (const [k, v] of Object.entries(src)) if (v && v.sentiment) sentiments[k] = v.sentiment;
+
+  const cleanRanks = {}, cleanSent = {};
+  for (const [k, v] of Object.entries(ranks).slice(0, 25)) {
+    const n = parseInt(v, 10);
+    cleanRanks[String(k).slice(0, 200)] = Number.isFinite(n) && n > 0 ? n : null;
+  }
+  for (const [k, v] of Object.entries(sentiments).slice(0, 25)) {
+    if (!v || !SENTIMENT_LABELS.includes(v.label)) continue;
+    const score = Math.max(-1, Math.min(1, Number(v.score) || 0));
+    cleanSent[String(k).slice(0, 200)] = { label: v.label, score: Math.round(score * 100) / 100, ...(v.reason ? { reason: String(v.reason).slice(0, 300) } : {}) };
+  }
+  return { ranks: cleanRanks, sentiments: cleanSent };
+}
 
 // =====================================================
 // Utilitaires
@@ -311,15 +379,21 @@ function enrichWithShareOfVoice(response, brands) {
 // Agrégation multi-réponses. Lignes au format geo_runs : { brand, provider, prompt, mentions{}, error, created_at }
 function aggregateShareOfVoice(rows, focusBrand) {
   const valid = (rows || []).filter(r => r && !r.error && r.mentions && typeof r.mentions === 'object');
-  const blank = () => ({ responses: 0, mentions: 0, responsesWithMention: 0, firstRank: 0 });
+  const blank = () => ({ mentions: 0, responsesWithMention: 0, mostMentioned: 0, rankSum: 0, rankCount: 0, citedFirst: 0, sentSum: 0, sentCount: 0, positive: 0, neutral: 0, negative: 0 });
   const totals = {}, byProvider = {}, byWeek = {};
   let responsesWithAnyBrand = 0;
 
-  const add = (bucket, name, n, isFirst) => {
+  const add = (bucket, name, n, isLeader, rank, sent) => {
     const b = bucket[name] || (bucket[name] = blank());
     b.mentions += n;
     if (n > 0) b.responsesWithMention++;
-    if (isFirst) b.firstRank++;
+    if (isLeader) b.mostMentioned++;
+    if (rank) { b.rankSum += rank; b.rankCount++; if (rank === 1) b.citedFirst++; }
+    if (sent && SENTIMENT_LABELS.includes(sent.label)) {
+      b[sent.label]++;
+      b.sentSum += Number(sent.score) || 0;
+      b.sentCount++;
+    }
   };
 
   for (const r of valid) {
@@ -333,10 +407,14 @@ function aggregateShareOfVoice(rows, focusBrand) {
     byProvider[prov].responses++;
     byWeek[week] = byWeek[week] || { responses: 0, brands: {} };
     byWeek[week].responses++;
+    const ranks = r.ranks && typeof r.ranks === 'object' ? r.ranks : {};
+    const sents = r.sentiments && typeof r.sentiments === 'object' ? r.sentiments : {};
     for (const [name, n] of Object.entries(counts)) {
-      add(totals, name, n, name === leaderName);
-      add(byProvider[prov].brands, name, n, name === leaderName);
-      add(byWeek[week].brands, name, n, name === leaderName);
+      const rank = n > 0 ? parseInt(ranks[name], 10) || null : null;
+      const args = [name, n, name === leaderName, rank, n > 0 ? sents[name] : null];
+      add(totals, ...args);
+      add(byProvider[prov].brands, ...args);
+      add(byWeek[week].brands, ...args);
     }
   }
 
@@ -348,8 +426,12 @@ function aggregateShareOfVoice(rows, focusBrand) {
         mentions: b.mentions,
         shareOfVoice: totalMentions ? round1((b.mentions / totalMentions) * 100) : 0,
         mentionRate: responses ? round1((b.responsesWithMention / responses) * 100) : 0,
-        leadRate: responses ? round1((b.firstRank / responses) * 100) : 0,
-        responsesWithMention: b.responsesWithMention
+        leadRate: responses ? round1((b.mostMentioned / responses) * 100) : 0,
+        responsesWithMention: b.responsesWithMention,
+        avgRank: b.rankCount ? round1(b.rankSum / b.rankCount) : null,
+        firstCitedRate: b.rankCount ? round1((b.citedFirst / b.rankCount) * 100) : null,
+        sentimentScore: b.sentCount ? Math.round((b.sentSum / b.sentCount) * 100) / 100 : null,
+        sentiment: { positive: b.positive, neutral: b.neutral, negative: b.negative }
       }))
       .sort((a, b) => b.shareOfVoice - a.shareOfVoice || b.mentionRate - a.mentionRate);
   };
@@ -377,6 +459,94 @@ function isoWeek(d) {
   const y = t.getUTCFullYear();
   const wk = Math.ceil(((t - Date.UTC(y, 0, 1)) / 86400000 + 1) / 7);
   return `${y}-W${String(wk).padStart(2, '0')}`;
+}
+
+// =====================================================
+// Sentiment par marque (Claude, sortie JSON structurée)
+// =====================================================
+const SENTIMENT_LABELS = ['positive', 'neutral', 'negative'];
+
+async function analyzeSentiment(text, brandNames, query) {
+  const apiKey = process.env.API_KEY_ANTHROPIC;
+  if (!apiKey) throw new Error('Anthropic API key not configured');
+
+  const system = `Tu analyses la façon dont une réponse d'assistant IA ou de moteur de recherche parle de marques. Pour chaque marque demandée, évalue le ton employé À SON SUJET dans la réponse, pas le ton général : positive (recommandée, mise en avant, qualités soulignées), neutral (simplement citée, listée sans jugement), negative (critiquée, déconseillée, défauts soulignés). score va de -1 (très négatif) à 1 (très positif), 0 = neutre. reason : une phrase courte en français citant l'élément du texte qui justifie le jugement.`;
+  const user = `Question posée : ${String(query || '').slice(0, 500)}
+
+Marques à évaluer : ${brandNames.join(', ')}
+
+<reponse>
+${String(text || '').slice(0, 12000)}
+</reponse>`;
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: process.env.SENTIMENT_MODEL || 'claude-opus-5-5',
+      max_tokens: 4000,
+      system,
+      messages: [{ role: 'user', content: user }],
+      output_config: {
+        effort: 'low',
+        format: {
+          type: 'json_schema',
+          schema: {
+            type: 'object',
+            properties: {
+              brands: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    brand: { type: 'string' },
+                    label: { type: 'string', enum: SENTIMENT_LABELS },
+                    score: { type: 'number' },
+                    reason: { type: 'string' }
+                  },
+                  required: ['brand', 'label', 'score', 'reason'],
+                  additionalProperties: false
+                }
+              }
+            },
+            required: ['brands'],
+            additionalProperties: false
+          }
+        }
+      }
+    })
+  });
+  if (!response.ok) throw new Error(`Anthropic Error ${response.status}: ${await readError(response)}`);
+  const data = await response.json();
+  if (data.stop_reason === 'refusal') throw new Error('Analyse de sentiment refusée par le modèle');
+  const textBlock = (data.content || []).find(b => b.type === 'text');
+  const parsed = JSON.parse(textBlock?.text || '{}');
+
+  const out = {};
+  for (const item of parsed.brands || []) {
+    const name = brandNames.find(n => normalize(n) === normalize(item.brand));
+    if (!name || !SENTIMENT_LABELS.includes(item.label)) continue;
+    const score = Math.max(-1, Math.min(1, Number(item.score) || 0));
+    out[name] = { label: item.label, score: Math.round(score * 100) / 100, reason: String(item.reason || '').slice(0, 300) };
+  }
+  return out;
+}
+
+// Ajoute brandStats[marque].sentiment et sentiments{} aux marques citées ; non bloquant en cas d'erreur
+async function enrichWithSentiment(response, query) {
+  const cited = Object.entries(response.brandStats || {}).filter(([, st]) => st.mentioned).map(([name]) => name);
+  response.sentiments = {};
+  if (!cited.length || !process.env.API_KEY_ANTHROPIC) return response;
+  const text = [response.content, response.aiOverview && response.aiOverview !== response.content ? response.aiOverview : '']
+    .filter(Boolean).join('\n\n');
+  try {
+    response.sentiments = await analyzeSentiment(text, cited, query);
+    for (const [name, sent] of Object.entries(response.sentiments)) response.brandStats[name].sentiment = sent;
+  } catch (error) {
+    console.error("⚠️ [SENTIMENT]", error.message);
+    response.sentimentError = error.message;
+  }
+  return response;
 }
 
 // =====================================================
