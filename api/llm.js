@@ -1,11 +1,17 @@
 /**
- * API PROXY MULTI-CHANNEL - Version 2.2
+ * API PROXY MULTI-CHANNEL - Version 2.4
  * Routes :
  *   POST /api/llm      → interroge un canal (openai, anthropic, google, perplexity, google_overviews)
  *   POST /api/suggest  → suggère des prompts (brand, sector, angle) via Claude
  *   POST /api/history  → enregistre les résultats d'un run (Supabase)
  *   GET  /api/history  → lit l'historique (?brand=&days=&limit=)
+ *   GET  /api/sov      → Share of Voice agrégé depuis l'historique (?brand=&days=&provider=)
+ *   POST /api/sov      → Share of Voice agrégé sur des lignes fournies ({ brand, rows[] })
  *   GET  /api/health   → état de la config
+ *
+ * Marques (champ `brands`) : chaînes ou objets { name, aliases?: [], domain? }.
+ *   Détection par mot entier, insensible casse/accents, tolérante aux séparateurs
+ *   (« Big View » = « BigView » = « big-view »). Le domaine sert aux citations.
  *
  * Variables d'environnement :
  *   TEAM_TOKEN, API_KEY_OPENAI, API_KEY_ANTHROPIC, API_KEY_GOOGLE, API_KEY_PERPLEXITY
@@ -63,7 +69,7 @@ module.exports = function(app) {
         default:
           return res.status(400).json({ error: 'Unknown provider', message: `Provider '${provider}' is not supported` });
       }
-      if (!response.brandMentions) response.brandMentions = countMentions(response.content, brands);
+      enrichWithShareOfVoice(response, brands);
       console.log(`✅ [SUCCESS] ${provider}`);
       return res.status(200).json(response);
     } catch (error) {
@@ -144,6 +150,41 @@ module.exports = function(app) {
       return res.status(500).json({ error: 'History Error', message: error.message });
     }
   });
+
+  // ---------- Share of Voice agrégé ----------
+  app.get("/api/sov", async (req, res) => {
+    if (!checkAuth(req, res)) return;
+    if (!historyConfigured()) return res.status(503).json({ error: 'History not configured', configured: false });
+
+    const brand = req.query.brand ? String(req.query.brand) : null;
+    const provider = req.query.provider ? String(req.query.provider) : null;
+    const days = Math.min(parseInt(req.query.days || '90', 10) || 90, 365);
+    const since = new Date(Date.now() - days * 86400000).toISOString();
+
+    const params = new URLSearchParams({
+      select: 'created_at,run_id,brand,competitors,prompt,provider,mentioned,mentions,has_ai_overview,error',
+      order: 'created_at.asc',
+      limit: '5000',
+      created_at: `gte.${since}`
+    });
+    if (brand) params.set('brand', `eq.${brand}`);
+    if (provider) params.set('provider', `eq.${provider}`);
+
+    try {
+      const rows = await supabase('GET', `geo_runs?${params}`);
+      return res.json({ status: 'success', days, ...aggregateShareOfVoice(rows, brand) });
+    } catch (error) {
+      console.error("❌ [ERROR] sov:", error.message);
+      return res.status(500).json({ error: 'SoV Error', message: error.message });
+    }
+  });
+
+  app.post("/api/sov", (req, res) => {
+    if (!checkAuth(req, res)) return;
+    const rows = Array.isArray(req.body.rows) ? req.body.rows.slice(0, 5000) : [];
+    if (!rows.length) return res.status(400).json({ error: 'Bad Request', message: 'rows[] is required' });
+    return res.json({ status: 'success', ...aggregateShareOfVoice(rows, req.body.brand || null) });
+  });
 };
 
 // =====================================================
@@ -159,23 +200,183 @@ async function readError(response) {
   }
 }
 
-// Comptage des mentions (insensible à la casse et aux accents)
+// =====================================================
+// Détection des mentions & Share of Voice
+// =====================================================
 function normalize(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
-function countMentions(text, brands) {
-  if (!Array.isArray(brands) || !text) return {};
+function escapeRe(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// { name, aliases[], domain } normalisé ; accepte une chaîne ou un objet
+function toBrandSpec(b) {
+  if (typeof b === 'string') return b.trim() ? { name: b.trim(), aliases: [], domain: null } : null;
+  if (!b || !b.name) return null;
+  const aliases = Array.isArray(b.aliases) ? b.aliases.map(a => String(a).trim()).filter(Boolean).slice(0, 10) : [];
+  const domain = b.domain ? normalize(b.domain).replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '') : null;
+  return { name: String(b.name).trim(), aliases, domain };
+}
+
+// Regex d'une marque : mot entier, séparateurs (espace, tiret, point, rien) interchangeables
+const brandRegexCache = new Map();
+function brandRegex(spec) {
+  const key = JSON.stringify(spec);
+  if (brandRegexCache.has(key)) return brandRegexCache.get(key);
+  const variants = [spec.name, ...spec.aliases, ...(spec.domain ? [spec.domain] : [])]
+    .map(v => normalize(v).trim())
+    .filter(Boolean)
+    .map(v => v.split(/[\s\-_.']+/).filter(Boolean).map(escapeRe).join("[\\s\\-_.']?"))
+    .sort((a, b) => b.length - a.length);
+  const re = variants.length ? new RegExp(`(?<![a-z0-9])(?:${variants.join('|')})(?![a-z0-9])`, 'g') : null;
+  if (brandRegexCache.size > 500) brandRegexCache.clear();
+  brandRegexCache.set(key, re);
+  return re;
+}
+
+// Analyse un texte : nombre de mentions, position de 1re mention, rang d'apparition
+function analyzeMentions(text, brands) {
+  const counts = {}, stats = {};
+  if (!Array.isArray(brands)) return { counts, stats };
   const hay = normalize(text);
+  for (const spec of brands.map(toBrandSpec).filter(Boolean)) {
+    const re = brandRegex(spec);
+    let count = 0, first = -1;
+    if (re && hay) {
+      re.lastIndex = 0;
+      let m;
+      while ((m = re.exec(hay)) !== null) {
+        if (first === -1) first = m.index;
+        count++;
+      }
+    }
+    counts[spec.name] = count;
+    stats[spec.name] = { count, mentioned: count > 0, firstPosition: first === -1 ? null : first, rank: null };
+  }
+  Object.entries(stats)
+    .filter(([, st]) => st.mentioned)
+    .sort((a, b) => a[1].firstPosition - b[1].firstPosition)
+    .forEach(([, st], i) => { st.rank = i + 1; });
+  return { counts, stats };
+}
+
+function hostnameOf(link) {
+  try { return new URL(link).hostname.toLowerCase().replace(/^www\./, ''); } catch { return ''; }
+}
+
+// Citations / sources attribuées à chaque marque (domaine déclaré, sinon nom compacté dans le domaine)
+function attributeSources(sources, brands) {
   const out = {};
-  for (const b of brands) {
-    const name = typeof b === 'string' ? b : b?.name;
-    if (!name) continue;
-    const needle = normalize(name);
-    let count = 0, idx = 0;
-    while (needle && (idx = hay.indexOf(needle, idx)) !== -1) { count++; idx += needle.length; }
-    out[name] = count;
+  if (!Array.isArray(brands)) return out;
+  const specs = brands.map(toBrandSpec).filter(Boolean);
+  for (const spec of specs) out[spec.name] = 0;
+  for (const src of sources || []) {
+    const host = hostnameOf(src.link || src.url || '');
+    if (!host) continue;
+    const compactHost = host.replace(/[^a-z0-9]/g, '');
+    for (const spec of specs) {
+      const keys = [spec.name, ...spec.aliases].map(v => normalize(v).replace(/[^a-z0-9]/g, '')).filter(k => k.length >= 4);
+      const hit = spec.domain
+        ? (host === spec.domain || host.endsWith('.' + spec.domain))
+        : keys.some(k => compactHost.includes(k));
+      if (hit) out[spec.name]++;
+    }
   }
   return out;
+}
+
+function shareOf(counts) {
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const out = {};
+  for (const [k, v] of Object.entries(counts)) out[k] = total ? Math.round((v / total) * 1000) / 10 : 0;
+  return out;
+}
+
+// Ajoute brandMentions / brandStats / shareOfVoice / sourceMentions à une réponse de provider
+function enrichWithShareOfVoice(response, brands) {
+  const text = response.mentionText != null ? response.mentionText : response.content;
+  delete response.mentionText;
+  const { counts, stats } = analyzeMentions(text, brands);
+  response.brandMentions = counts;
+  response.brandStats = stats;
+  response.shareOfVoice = shareOf(counts);
+  if (Array.isArray(response.sources)) {
+    response.sourceMentions = attributeSources(response.sources, brands);
+    response.citationShare = shareOf(response.sourceMentions);
+  }
+  return response;
+}
+
+// Agrégation multi-réponses. Lignes au format geo_runs : { brand, provider, prompt, mentions{}, error, created_at }
+function aggregateShareOfVoice(rows, focusBrand) {
+  const valid = (rows || []).filter(r => r && !r.error && r.mentions && typeof r.mentions === 'object');
+  const blank = () => ({ responses: 0, mentions: 0, responsesWithMention: 0, firstRank: 0 });
+  const totals = {}, byProvider = {}, byWeek = {};
+  let responsesWithAnyBrand = 0;
+
+  const add = (bucket, name, n, isFirst) => {
+    const b = bucket[name] || (bucket[name] = blank());
+    b.mentions += n;
+    if (n > 0) b.responsesWithMention++;
+    if (isFirst) b.firstRank++;
+  };
+
+  for (const r of valid) {
+    const counts = Object.fromEntries(Object.entries(r.mentions).map(([k, v]) => [k, Number(v) || 0]));
+    const leader = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+    const leaderName = leader && leader[1] > 0 ? leader[0] : null;
+    if (leaderName) responsesWithAnyBrand++;
+    const prov = String(r.provider || 'unknown');
+    const week = r.created_at ? isoWeek(new Date(r.created_at)) : 'n/a';
+    byProvider[prov] = byProvider[prov] || { responses: 0, brands: {} };
+    byProvider[prov].responses++;
+    byWeek[week] = byWeek[week] || { responses: 0, brands: {} };
+    byWeek[week].responses++;
+    for (const [name, n] of Object.entries(counts)) {
+      add(totals, name, n, name === leaderName);
+      add(byProvider[prov].brands, name, n, name === leaderName);
+      add(byWeek[week].brands, name, n, name === leaderName);
+    }
+  }
+
+  const finalize = (brandsMap, responses) => {
+    const totalMentions = Object.values(brandsMap).reduce((a, b) => a + b.mentions, 0);
+    return Object.entries(brandsMap)
+      .map(([name, b]) => ({
+        brand: name,
+        mentions: b.mentions,
+        shareOfVoice: totalMentions ? round1((b.mentions / totalMentions) * 100) : 0,
+        mentionRate: responses ? round1((b.responsesWithMention / responses) * 100) : 0,
+        leadRate: responses ? round1((b.firstRank / responses) * 100) : 0,
+        responsesWithMention: b.responsesWithMention
+      }))
+      .sort((a, b) => b.shareOfVoice - a.shareOfVoice || b.mentionRate - a.mentionRate);
+  };
+
+  const ranking = finalize(totals, valid.length);
+  const focus = focusBrand ? ranking.find(x => normalize(x.brand) === normalize(focusBrand)) || null : null;
+
+  return {
+    responses: valid.length,
+    errors: (rows || []).length - valid.length,
+    responsesWithAnyBrand,
+    focus: focus ? { ...focus, position: ranking.indexOf(focus) + 1 } : null,
+    ranking,
+    byProvider: Object.fromEntries(Object.entries(byProvider).map(([p, v]) => [p, { responses: v.responses, ranking: finalize(v.brands, v.responses) }])),
+    timeline: Object.keys(byWeek).sort().map(w => ({ week: w, responses: byWeek[w].responses, ranking: finalize(byWeek[w].brands, byWeek[w].responses) }))
+  };
+}
+
+function round1(x) { return Math.round(x * 10) / 10; }
+function isoWeek(d) {
+  if (isNaN(d)) return 'n/a';
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const y = t.getUTCFullYear();
+  const wk = Math.ceil(((t - Date.UTC(y, 0, 1)) / 86400000 + 1) / 7);
+  return `${y}-W${String(wk).padStart(2, '0')}`;
 }
 
 // =====================================================
@@ -337,7 +538,10 @@ async function callPerplexity(query) {
   });
   if (!response.ok) throw new Error(`Perplexity Error ${response.status}: ${await readError(response)}`);
   const data = await response.json();
-  return { status: 'success', provider: 'perplexity', content: data.choices?.[0]?.message?.content || 'No response' };
+  const sources = Array.isArray(data.search_results) && data.search_results.length
+    ? data.search_results.map(r => ({ title: r.title || '', link: r.url }))
+    : (data.citations || []).map(url => ({ title: '', link: url }));
+  return { status: 'success', provider: 'perplexity', content: data.choices?.[0]?.message?.content || 'No response', sources };
 }
 
 // =====================================================
@@ -385,7 +589,8 @@ async function analyzeViaSerpApi(query, brands, location) {
     hasAiOverview: Boolean(aioText), content,
     aiOverview: aioText || null, aiOverviewSources: aioSources, organic,
     location: location || null,
-    brandMentions: countMentions(`${aioText || ''}\n${organicClean.map(o => o.title + ' ' + o.snippet).join(' ')}`, brands)
+    sources: [...aioSources, ...organicClean.map(o => ({ title: o.title, link: o.link }))],
+    mentionText: `${aioText || ''}\n${organicClean.map(o => o.title + ' ' + o.snippet).join(' ')}`
   };
 }
 
@@ -421,7 +626,7 @@ async function analyzeViaCustomSearch(query, brands) {
     status: 'success', provider: 'google_overviews', source: 'custom_search',
     hasAiOverview: false, content, aiOverview: null, organic,
     totalResults: data.searchInformation?.totalResults || 0,
-    brandMentions: countMentions(content, brands)
+    sources: organic.map(o => ({ title: o.title, link: o.link }))
   };
 }
 
