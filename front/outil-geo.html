@@ -335,11 +335,11 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Marque à surveiller</label>
-                        <input type="text" id="brandInput" placeholder="ex. Big View" value="Big View">
+                        <input type="text" id="brandInput" placeholder="À renseigner — ex. Big View">
                     </div>
                     <div class="form-group">
                         <label>Secteur / offre <span class="hint">(aide la suggestion)</span></label>
-                        <input type="text" id="sectorInput" placeholder="ex. agence SEO et GEO pour PME, Paris / Nantes">
+                        <input type="text" id="sectorInput" placeholder="À renseigner — ex. agence SEO et GEO pour PME">
                     </div>
                 </div>
                 <div class="reuse-hint" id="reuseHint">
@@ -347,18 +347,18 @@
                     <button class="btn-secondary btn-small" id="reuseHintBtn">↺ Reprendre ces prompts</button>
                 </div>
                 <div class="form-group">
-                    <label>Localisation Google Overviews <span style="font-weight:400">(optionnel — ex. « Montpellier, France » : simule une recherche depuis cette ville)</span></label>
-                    <input type="text" id="locationInput" placeholder="ex. Montpellier, Occitanie, France">
+                    <label>Localisation Google Overviews <span class="hint">(Ville + Pays, ex. « Montpellier, France » : simule une recherche depuis cette ville — facultatif)</span></label>
+                    <input type="text" id="locationInput" placeholder="Ville, Pays — ex. Montpellier, France">
                 </div>
 
                 <div class="form-group">
-                    <label>Concurrents à suivre <span class="hint">(séparés par des virgules, facultatif)</span></label>
-                    <input type="text" id="competitorsInput" placeholder="ex. Eskimoz, Primelis, Ekko Media">
+                    <label>Concurrents à suivre <span class="hint">(5 maximum, séparés par des virgules)</span> <span class="hint" id="compCount"></span></label>
+                    <input type="text" id="competitorsInput" placeholder="À renseigner — 5 concurrents maximum, ex. Eskimoz, Primelis, Ekko Media">
                 </div>
 
                 <div class="form-group">
-                    <label>Prompts à tester <span class="hint">(un par ligne, [BRAND] sera remplacé par la marque)</span></label>
-                    <textarea id="promptsInput" placeholder="ex. Quelle agence SEO choisir pour une PME à Nantes ?&#10;ex. Quels sont les meilleurs experts GEO en France ?"></textarea>
+                    <label>Prompts à tester <span class="hint">(à renseigner : un par ligne, [BRAND] sera remplacé par la marque)</span></label>
+                    <textarea id="promptsInput" placeholder="À renseigner : un prompt par ligne&#10;ex. Quelle agence SEO choisir pour une PME à Nantes ?&#10;ex. Quels sont les meilleurs experts GEO en France ?"></textarea>
                     <div class="button-group" style="margin-top:10px;">
                         <button class="btn-secondary btn-small" id="suggestBtn">✨ Suggérer des prompts</button>
                         <button class="btn-secondary btn-small" id="reuseBtn">↺ Reprendre la dernière étude</button>
@@ -492,6 +492,7 @@
         let lastStudy = null;   // dernière étude connue pour la marque saisie (pour la reprise)
         let autoFilled = false; // champs remplis automatiquement depuis la dernière étude, pas encore modifiés
         const BRAND_KEY = 'geo_last_brand';
+        const MAX_COMPETITORS = 5;
 
         // Elements
         const $ = id => document.getElementById(id);
@@ -593,8 +594,8 @@
             catch { return null; }
         }
         const studyFields = () => [promptsInput, competitorsInput, sectorInput];
-        function clearStudyFields() { studyFields().forEach(el => { el.value = ''; }); autoFilled = false; }
-        async function proposeLastStudy(autoLoad = true) {
+        function clearStudyFields() { studyFields().forEach(el => { el.value = ''; }); autoFilled = false; updateCompCount(); }
+        async function proposeLastStudy(autoLoad = false) {
             const brand = brandInput.value.trim();
             const hint = $('reuseHint');
             if (autoFilled) clearStudyFields(); // la marque a changé : on ne garde pas l'étude d'une autre marque
@@ -620,10 +621,17 @@
             sectorInput.value = d.sector || '';
             if (d.angle && ANGLE_NAMES[d.angle]) setAngle(d.angle);
             if (d.providers && d.providers.length) PROVIDERS.forEach(p => { $('ch-' + p.id).checked = d.providers.includes(p.id); });
-            autoFilled = true;
+            autoFilled = true; updateCompCount();
             if (!auto) { $('reuseHint').classList.remove('visible'); toast(`Étude du ${fmtDate(d.date)} reprise : ${d.prompts.length} prompt(s)`); }
         }
         studyFields().forEach(el => el.addEventListener('input', () => { autoFilled = false; }));
+        function updateCompCount() {
+            const n = getCompetitors().length, el = $('compCount');
+            el.textContent = n ? `— ${n}/${MAX_COMPETITORS}` : '';
+            el.style.color = n > MAX_COMPETITORS ? 'var(--red)' : '';
+            competitorsInput.style.borderColor = n > MAX_COMPETITORS ? 'var(--red)' : '';
+        }
+        competitorsInput.addEventListener('input', updateCompCount);
         async function reuseLastStudy(btn) {
             const brand = brandInput.value.trim();
             if (!brand) return alert('Saisissez la marque à surveiller');
@@ -645,7 +653,10 @@
             const brand = brandInput.value.trim();
             if (!brand) return alert('Saisissez la marque à surveiller');
             const prompts = getPrompts(brand);
-            if (!prompts.length) return alert('Saisissez au moins un prompt');
+            if (!prompts.length) { promptsInput.focus(); return alert('Renseignez au moins un prompt à tester (un par ligne)'); }
+            if (getCompetitors().length > MAX_COMPETITORS) { competitorsInput.focus(); return alert(`${MAX_COMPETITORS} concurrents maximum : retirez-en ${getCompetitors().length - MAX_COMPETITORS}.`); }
+            const loc = $('locationInput').value.trim();
+            if (loc && !loc.includes(',')) { $('locationInput').focus(); return alert('Précisez la localisation sous la forme « Ville, Pays » (ex. « Montpellier, France »).'); }
             const providers = getSelectedProviders();
             if (!providers.length) return alert('Sélectionnez au moins un canal');
             if (prompts.length * providers.length > 60 && !confirm(`${prompts.length * providers.length} appels API vont être lancés. Continuer ?`)) return;
