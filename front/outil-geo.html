@@ -246,6 +246,16 @@
         .trend.gagné, .trend.en.hausse { background: rgba(4,217,157,.18); color: #00805a; }
         .trend.perdu, .trend.en.baisse { background: var(--red-light); color: var(--red); }
 
+        /* Sentiment général : œil Big View */
+        .sentiment-card { display: flex; gap: 18px; align-items: center; background: var(--light-green); border-radius: 8px; padding: 14px 18px; margin-bottom: 16px; }
+        .sentiment-card .eye { flex: 0 0 auto; line-height: 0; }
+        .sentiment-title { font-family: 'Raleway', sans-serif; font-weight: 800; font-size: 1.25em; color: var(--text-bold); }
+        .sentiment-sub { font-size: 0.88em; margin-top: 2px; }
+        .level-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+        .level-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px 2px 3px; border-radius: 14px; background: var(--light); border: 1px solid var(--border); font-size: 0.8em; color: var(--text-bold); }
+        .level-chip.zero { opacity: .45; }
+        .cell .mini-eye { margin-left: 5px; line-height: 0; display: inline-block; vertical-align: middle; background: #fff; border-radius: 50%; padding: 1px; }
+
         /* Exports */
         .export-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 4px 0 18px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-light); }
         .export-bar strong { font-family: 'Raleway', sans-serif; color: var(--text-bold); margin-right: 6px; }
@@ -479,6 +489,58 @@
         const providerName = id => (providerById[id] ? providerById[id].name : id);
         const ANGLE_NAMES = { direct: 'Question directe', expert: 'Expert', data: 'Data-driven', recommendation: 'Recommandation', comparison: 'Comparatif', custom: 'Personnalisé' };
         const SENTIMENT_FR = { positive: 'Positif', neutral: 'Neutre', negative: 'Négatif' };
+
+        // ---------- Niveaux de sentiment et œil Big View (même dessin que api/sentiment-level.js) ----------
+        const LEVELS = [
+            { key: 'tres_positif', label: 'Très positif' },
+            { key: 'positif', label: 'Positif' },
+            { key: 'neutre', label: 'Neutre / informatif' },
+            { key: 'negatif', label: 'Négatif' },
+            { key: 'tres_negatif', label: 'Très négatif' }
+        ];
+        function levelOf(score) {
+            if (score == null || !Number.isFinite(Number(score))) return null;
+            const s = Number(score);
+            return LEVELS[s >= 0.6 ? 0 : s >= 0.2 ? 1 : s > -0.2 ? 2 : s > -0.6 ? 3 : 4];
+        }
+        const fmtScore = v => v == null ? '–' : (v > 0 ? '+' : '') + fmtNum(Math.round(v * 100) / 100);
+        let eyeSeq = 0;
+        function eyeSvg(levelKey, size = 100) {
+            const E = {
+                tres_positif: { ring: '#04D99D', px: 59, py: 41, pr: 15, sparkle: true, halo: true },
+                positif: { ring: '#04D99D', px: 61, py: 39, pr: 13 },
+                neutre: { ring: '#04D99D', px: 50, py: 50, pr: 12 },
+                negatif: { ring: '#F3D604', px: 42, py: 58, pr: 12, lid: 'M10 44 L90 44 L90 0 L10 0 Z', lidLine: 'M19 44 L81 44' },
+                tres_negatif: { ring: '#595959', px: 47, py: 64, pr: 11, lid: 'M10 18 L50 46 L90 18 L90 0 L10 0 Z', lidLine: 'M24 28 L50 46 L76 28' }
+            }[levelKey] || { ring: '#E0E0E0', px: 50, py: 50, pr: 12, empty: true };
+            const id = 'eyeClip' + (++eyeSeq), iris = E.empty ? '#F0FAF6' : '#4FB39B';
+            let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${size}" height="${size}" role="img" aria-label="Œil Big View">`;
+            s += `<defs><clipPath id="${id}"><circle cx="50" cy="50" r="31"/></clipPath></defs>`;
+            s += `<circle cx="50" cy="50" r="48" fill="${E.ring}"/><circle cx="49" cy="52" r="32" fill="#000"/><circle cx="50" cy="50" r="31" fill="${iris}"/>`;
+            s += `<g clip-path="url(#${id})">`;
+            if (!E.empty) s += `<circle cx="${E.px}" cy="${E.py}" r="${E.pr}" fill="#000"/>`;
+            if (E.sparkle) s += `<circle cx="${E.px + 5}" cy="${E.py - 5}" r="4" fill="#fff"/><circle cx="${E.px - 5}" cy="${E.py + 6}" r="1.8" fill="#fff"/>`;
+            if (E.lid) s += `<path d="${E.lid}" fill="${E.ring}"/>`;
+            s += `</g>`;
+            if (E.lidLine) s += `<path d="${E.lidLine}" stroke="#000" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+            if (E.halo) s += `<circle cx="50" cy="50" r="45" fill="none" stroke="#F3D604" stroke-width="4"/><path d="M80 10 l2 6 6 2 -6 2 -2 6 -2 -6 -6 -2 6 -2 z" fill="#F3D604"/>`;
+            if (E.empty) s += `<text x="50" y="58" font-family="Arial" font-size="22" text-anchor="middle" fill="#595959">?</text>`;
+            return s + `</svg>`;
+        }
+        // Bloc « sentiment général » : moyenne des scores des réponses citant la marque + répartition sur 5 niveaux
+        function sentimentCard(scores, brand, deltaText) {
+            const counts = Object.fromEntries(LEVELS.map(l => [l.key, 0]));
+            scores.forEach(v => { const l = levelOf(v); if (l) counts[l.key]++; });
+            const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+            const lv = levelOf(avg);
+            const title = lv ? `Sentiment général : ${lv.label} (${fmtScore(avg)})` : 'Sentiment général : pas encore mesuré';
+            const sub = lv ? `Ton employé par les IA quand elles citent ${esc(brand)}, sur ${scores.length} réponse(s).${deltaText ? ' ' + deltaText : ''}`
+                           : `Aucune réponse citant ${esc(brand)} avec une analyse de sentiment.`;
+            return `<div class="sentiment-card"><div class="eye" title="${lv ? lv.label : ''}">${eyeSvg(lv ? lv.key : null, 84)}</div><div>
+                <div class="sentiment-title">${title}</div><div class="sentiment-sub">${sub}</div>
+                ${lv ? `<div class="level-chips">${LEVELS.map(l => `<span class="level-chip${counts[l.key] ? '' : ' zero'}">${eyeSvg(l.key, 20)} ${l.label} : ${counts[l.key]}</span>`).join('')}</div>` : ''}
+            </div></div>`;
+        }
 
         // State
         let currentAngle = 'direct';
@@ -724,8 +786,12 @@
             $('resultsCount').style.display = 'inline-block';
             $('resultsCount').textContent = `${prompts.length} prompt(s) × ${providers.length} canal(aux)`;
 
-            let html = `<div class="legend"><span class="l-yes">${esc(brand)} cité (#rang)</span><span class="l-no">Non cité</span><span class="l-err">Erreur</span>`;
-            html += `<span style="margin-left:8px"><i class="sent positive"></i> <i class="sent neutral"></i> <i class="sent negative"></i> sentiment</span>`;
+            const scores = Object.values(results).filter(r => r.status === 'ok' && !r.noAio && r.mentioned && r.stats && r.stats[brand] && r.stats[brand].sentiment)
+                .map(r => Number(r.stats[brand].sentiment.score)).filter(Number.isFinite);
+            const finished = Object.keys(results).length >= prompts.length * providers.length;
+            let html = (scores.length || finished) ? sentimentCard(scores, brand) : '';
+            html += `<div class="legend"><span class="l-yes">${esc(brand)} cité (#rang)</span><span class="l-no">Non cité</span><span class="l-err">Erreur</span>`;
+            html += `<span style="margin-left:8px">${eyeSvg('positif', 14)} regard = sentiment de la réponse</span>`;
             if (competitors.length) html += `<span style="margin-left:auto">Chiffre = nombre de concurrents cités</span>`;
             if (providers.includes('google_overviews')) html += `<span class="l-noaio" style="margin-left:12px">∅ = pas d'AI Overview sur cette requête (hors calcul)</span>`;
             html += `</div><div class="table-wrap"><table class="matrix"><thead><tr><th style="text-align:left">Prompt</th>`;
@@ -746,7 +812,8 @@
                     const compCount = competitors.filter(c => r.mentions[c] > 0).length;
                     const st = r.stats && r.stats[brand];
                     const rank = r.mentioned && st && st.rank ? `<span class="rank">#${st.rank}</span>` : '';
-                    const sent = r.mentioned && st && st.sentiment ? `<i class="sent ${st.sentiment.label}" title="Sentiment ${SENTIMENT_FR[st.sentiment.label]}"></i>` : '';
+                    const lvl = r.mentioned && st && st.sentiment ? levelOf(st.sentiment.score) : null;
+                    const sent = lvl ? `<span class="mini-eye" title="Sentiment ${lvl.label} (${fmtScore(st.sentiment.score)})">${eyeSvg(lvl.key, 18)}</span>` : '';
                     html += `<td><span class="cell ${r.mentioned ? 'yes' : 'no'}" data-key="${esc(prompt + '|' + p)}" title="Cliquer pour voir la réponse">${r.mentioned ? '✓' : '✗'}${rank}${sent}${competitors.length ? ` <small style="opacity:.75;margin-left:4px">${compCount}</small>` : ''}</span></td>`;
                 }
                 html += `<td class="score-cell">${n ? Math.round(yes / n * 100) + '%' : '–'}</td></tr>`;
@@ -782,7 +849,7 @@
             const { brand, competitors } = currentRun;
             $('detailTitle').textContent = `${providerById[provider].icon} ${providerById[provider].name}`;
             const st = r.stats && r.stats[brand];
-            const extraMeta = r.mentioned && st ? ` — ${brand} : rang ${st.rank || '?'}${st.sentiment ? `, sentiment ${SENTIMENT_FR[st.sentiment.label].toLowerCase()} (${st.sentiment.score > 0 ? '+' : ''}${fmtNum(st.sentiment.score)})${st.sentiment.reason ? ' : ' + st.sentiment.reason : ''}` : ''}` : '';
+            const extraMeta = r.mentioned && st ? ` — ${brand} : rang ${st.rank || '?'}${st.sentiment ? `, sentiment ${(levelOf(st.sentiment.score) || {}).label?.toLowerCase() || SENTIMENT_FR[st.sentiment.label].toLowerCase()} (${fmtScore(st.sentiment.score)})${st.sentiment.reason ? ' : ' + st.sentiment.reason : ''}` : ''}` : '';
             $('detailMeta').textContent = prompt + extraMeta;
             detailPanel.classList.toggle('err', r.status === 'error');
             if (r.status === 'error') { $('detailText').textContent = r.error; }
@@ -909,7 +976,7 @@
                 <div class="kpi"><div class="kpi-value">${fmtNum(s.shareOfVoice)} %</div><div class="kpi-label">Part de voix</div><div class="kpi-delta">${deltaHtml(d.previous ? dl.shareOfVoice : null)}</div></div>
                 <div class="kpi"><div class="kpi-value">${fmtNum(s.mentionRate)} %</div><div class="kpi-label">Taux de mention</div><div class="kpi-delta">${deltaHtml(d.previous ? dl.mentionRate : null)}</div></div>
                 <div class="kpi"><div class="kpi-value">${fmtNum(s.avgRank)}</div><div class="kpi-label">Rang moyen</div><div class="kpi-delta">${deltaHtml(d.previous ? dl.avgRank : null, { unit: '', lowerIsBetter: true })}</div></div>
-                <div class="kpi"><div class="kpi-value">${s.sentimentScore == null ? '–' : (s.sentimentScore > 0 ? '+' : '') + fmtNum(s.sentimentScore)}</div><div class="kpi-label">Sentiment (-1 à +1)</div><div class="kpi-delta">${deltaHtml(d.previous ? dl.sentimentScore : null, { unit: '' })}</div></div>
+                <div class="kpi"><div class="kpi-value" style="display:flex;align-items:center;justify-content:center;gap:8px">${s.sentimentScore == null ? '' : eyeSvg(levelOf(s.sentimentScore).key, 30)}${fmtScore(s.sentimentScore)}</div><div class="kpi-label">Sentiment${s.sentimentScore == null ? '' : ' ' + levelOf(s.sentimentScore).label.toLowerCase()} (-1 à +1)</div><div class="kpi-delta">${deltaHtml(d.previous ? dl.sentimentScore : null, { unit: '' })}</div></div>
             </div>`;
             if (d.previous && d.prompts.length) {
                 html += `<div class="table-wrap"><table class="matrix"><thead><tr><th style="text-align:left">Prompt</th>${d.providers.map(p => `<th>${esc(providerName(p))}</th>`).join('')}<th>Cité</th></tr></thead><tbody>`;

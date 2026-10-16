@@ -25,6 +25,10 @@ const { groupRuns, pickRun, buildProgress } = require('./runs.js');
 
 const DEFAULT_SHARE_WITH = 'florent.buil@big-view.fr';
 const SENTIMENT_FR = { positive: 'Positif', neutral: 'Neutre', negative: 'Négatif' };
+const { LEVELS, levelOf } = require('./sentiment-level.js');
+// Œil Big View dont le regard traduit le sentiment (PNG générés par scripts/build-eyes.js)
+const eyeFile = (key) => path.join(__dirname, '..', 'assets', `eye-${LEVELS.some(l => l.key === key) ? key : 'inconnu'}.png`);
+const levelLabel = (score) => { const l = levelOf(score); return l ? l.label : ''; };
 const TAGLINE = "L'IA accélère, l'expérience pilote.";
 
 // Charte Big View
@@ -41,6 +45,7 @@ const FONTS = {
 module.exports = function(app, { checkAuth, historyConfigured, readSovRows, readRunRows, sovFilters, aggregateShareOfVoice, normalize }) {
 
   app.get('/assets/logo-bigview.png', (req, res) => res.sendFile(LOGO));
+  app.get('/assets/eye-:level.png', (req, res) => res.sendFile(eyeFile(req.params.level)));
 
   app.get('/api/export', async (req, res) => {
     if (!checkAuth(req, res)) return;
@@ -187,8 +192,7 @@ function fmtNum(v) { return v == null ? '-' : String(v).replace('.', ','); }
 function fmtScore(v) { return v == null ? '-' : `${v > 0 ? '+' : ''}${fmtNum(v)}`; }
 function fmtSent(score) {
   if (score == null) return '-';
-  const label = score > 0.2 ? 'Positif' : score < -0.2 ? 'Négatif' : 'Neutre';
-  return `${label} (${fmtScore(score)})`;
+  return `${levelLabel(score)} (${fmtScore(score)})`;
 }
 function ordinal(n) { return n === 1 ? '1re' : `${n}e`; }
 function slug(s) { return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'export'; }
@@ -254,10 +258,10 @@ function detailCsv({ rows, brands, brand, trends }) {
       r.created_at ? new Date(r.created_at).toLocaleString('fr-FR') : '',
       r.run_id || '', r.brand || '', r.provider || '', r.prompt || '',
       r.mentions && r.mentions[focus] > 0 ? 'oui' : 'non',
-      ranks[focus] ?? '', fs ? SENTIMENT_FR[fs.label] : '', fs ? fs.score : '',
+      ranks[focus] ?? '', fs ? levelLabel(fs.score) || SENTIMENT_FR[fs.label] : '', fs ? fs.score : '',
       TREND_FR[trends.get(`${r.prompt}|${r.provider}`)] || ''
     ];
-    for (const b of brands) line.push(r.mentions ? (r.mentions[b] ?? '') : '', ranks[b] ?? '', sents[b] ? SENTIMENT_FR[sents[b].label] : '');
+    for (const b of brands) line.push(r.mentions ? (r.mentions[b] ?? '') : '', ranks[b] ?? '', sents[b] ? levelLabel(sents[b].score) || SENTIMENT_FR[sents[b].label] : '');
     line.push(r.excerpt || '', r.error || '');
     lines.push(line);
   }
@@ -265,11 +269,11 @@ function detailCsv({ rows, brands, brand, trends }) {
 }
 
 function summaryCsv({ agg, timeline, brand }) {
-  const header = ['Périmètre', 'Marque', 'Part de voix (%)', 'Taux de mention (%)', 'Rang moyen', 'Cité en 1er (%)', 'Score sentiment', 'Positif', 'Neutre', 'Négatif', 'Mentions', 'Réponses'];
+  const header = ['Périmètre', 'Marque', 'Part de voix (%)', 'Taux de mention (%)', 'Rang moyen', 'Cité en 1er (%)', 'Score sentiment', 'Sentiment général', ...LEVELS.map(l => l.label), 'Mentions', 'Réponses'];
   const lines = [header];
   const push = (scope, list, responses) => list.forEach(x => lines.push([
     scope, x.brand, x.shareOfVoice, x.mentionRate, x.avgRank, x.firstCitedRate, x.sentimentScore,
-    x.sentiment.positive, x.sentiment.neutral, x.sentiment.negative, x.mentions, responses
+    levelLabel(x.sentimentScore), ...LEVELS.map(l => (x.sentimentLevels || {})[l.key] || 0), x.mentions, responses
   ]));
   push('Global', agg.ranking, agg.responses);
   for (const [prov, v] of Object.entries(agg.byProvider)) push(prov, v.ranking, v.responses);
@@ -324,6 +328,7 @@ function writePdf(report, stream) {
     doc.moveDown(0.6);
   }
   accroche(doc, headline(report));
+  pdfEye(doc, report);
   if (agg.focus) doc.fillColor(GRAY).font('Body').fontSize(9).text(`${ordinal(agg.focus.position)} position sur ${agg.ranking.length} marques suivies, ${agg.responses} réponses analysées.`, M, doc.y);
   doc.moveDown(0.5);
 
@@ -360,12 +365,12 @@ function writePdf(report, stream) {
   subTitle(doc, 'Sentiment des mentions');
   const withSent = agg.ranking.filter(x => x.sentimentScore != null || (report.prevAgg && focusIn(report.prevAgg.ranking, x.brand)));
   if (withSent.length) {
-    table(doc, ['Marque', 'Score moyen', 'Évolution', 'Positif', 'Neutre', 'Négatif'],
+    table(doc, ['Marque', 'Sentiment général', 'Évol.', 'Très pos.', 'Positif', 'Neutre / info.', 'Négatif', 'Très nég.'],
       withSent.map(x => {
         const prev = report.prevAgg && focusIn(report.prevAgg.ranking, x.brand);
         const d = prev && delta(x.sentimentScore, prev.sentimentScore, { unit: '', digits: 2 });
-        return [x.brand, fmtSent(x.sentimentScore), d ? d.text : '-', String(x.sentiment.positive), String(x.sentiment.neutral), String(x.sentiment.negative)];
-      }), [0.28, 0.22, 0.14, 0.12, 0.12, 0.12], brand);
+        return [x.brand, fmtSent(x.sentimentScore), d ? d.text : '-', ...LEVELS.map(l => String((x.sentimentLevels || {})[l.key] || 0))];
+      }), [0.17, 0.25, 0.08, 0.09, 0.09, 0.12, 0.1, 0.1], brand);
   } else {
     doc.fillColor(GRAY).font('Body').fontSize(9).text('Aucune mention de marque dans les réponses : pas de sentiment à mesurer.', M, doc.y);
   }
@@ -472,6 +477,32 @@ function pdfFooters(doc) {
 
 function ensureSpace(doc, h) {
   if (doc.y + h > doc.page.height - 60) { doc.addPage(); doc.y = M; }
+}
+
+// Bloc « sentiment général » : œil Big View dont le regard traduit le niveau, libellé et évolution
+function sentimentSummary(report) {
+  const f = report.agg.focus;
+  if (!f || f.sentimentScore == null) return null;
+  const lv = levelOf(f.sentimentScore);
+  const p = report.prevFocus;
+  const d = p && delta(f.sentimentScore, p.sentimentScore, { unit: '', digits: 2 });
+  const counts = LEVELS.map(l => `${l.label} : ${(f.sentimentLevels || {})[l.key] || 0}`).join(' · ');
+  return {
+    key: lv.key,
+    title: `Sentiment général : ${lv.label} (${fmtScore(f.sentimentScore)})`,
+    sub: (d ? (d.value === 0 ? `Stable depuis l'${report.previousLabel}. ` : `${d.value > 0 ? 'En amélioration' : 'En baisse'} de ${d.text} depuis l'${report.previousLabel}. `) : '') + `Réponses citant ${report.brand} — ${counts}`
+  };
+}
+function pdfEye(doc, report) {
+  const s = sentimentSummary(report);
+  if (!s) return;
+  ensureSpace(doc, 66);
+  const y = doc.y, W = doc.page.width - 2 * M;
+  doc.rect(M, y, W, 60).fill(TINT);
+  doc.image(eyeFile(s.key), M + 8, y + 6, { width: 48 });
+  doc.fillColor(BLACK).font('Title').fontSize(12).text(s.title, M + 66, y + 10, { width: W - 76, lineBreak: false });
+  doc.fillColor(GRAY).font('Body').fontSize(8.5).text(s.sub, M + 66, y + 28, { width: W - 76, height: 28, ellipsis: true });
+  doc.x = M; doc.y = y + 68;
 }
 
 function section(doc, title) {
@@ -773,14 +804,20 @@ function slidesRequests(report, logoUrl, defaultSlides) {
   }
 
   s = content('Sentiment des mentions');
+  const se = sentimentSummary(report);
+  if (se) {
+    if (logoUrl) reqs.push({ createImage: { objectId: `${s}_eye`, url: logoUrl.replace('logo-bigview.png', `eye-${se.key}.png`), elementProperties: box(s, 40, 62, 76, 76) } });
+    reqs.push(...textBox(`${s}_et`, s, 130, 70, 550, 26, se.title, { size: 16, bold: true, font: 'Raleway', color: BLACK }));
+    reqs.push(...textBox(`${s}_es`, s, 130, 98, 550, 40, se.sub, { size: 10 }));
+  }
   const withSent = agg.ranking.filter(x => x.sentimentScore != null || (report.prevAgg && focusIn(report.prevAgg.ranking, x.brand)));
   if (withSent.length) {
-    reqs.push(...slideTable(`${s}_tb`, s, ['Marque', 'Score moyen', 'Évolution', 'Positif', 'Neutre', 'Négatif'],
-      withSent.slice(0, 10).map(x => {
+    reqs.push(...slideTable(`${s}_tb`, s, ['Marque', 'Sentiment général', 'Évol.', 'Très positif', 'Positif', 'Neutre / informatif', 'Négatif', 'Très négatif'],
+      withSent.slice(0, 9).map(x => {
         const prev = report.prevAgg && focusIn(report.prevAgg.ranking, x.brand);
         const d = prev && delta(x.sentimentScore, prev.sentimentScore, { unit: '', digits: 2 });
-        return [x.brand, fmtSent(x.sentimentScore), d ? (d.dir === 'better' ? '▲ ' : d.dir === 'worse' ? '▼ ' : '') + d.text : '-', x.sentiment.positive, x.sentiment.neutral, x.sentiment.negative];
-      }), { highlight: brand }));
+        return [x.brand, fmtSent(x.sentimentScore), d ? (d.dir === 'better' ? '▲ ' : d.dir === 'worse' ? '▼ ' : '') + d.text : '-', ...LEVELS.map(l => (x.sentimentLevels || {})[l.key] || 0)];
+      }), { highlight: brand, fontSize: 8, y: 150 }));
   } else {
     reqs.push(...textBox(`${s}_e`, s, 40, 80, 640, 30, 'Aucune mention de marque dans les réponses : pas de sentiment à mesurer.', { size: 11 }));
   }
