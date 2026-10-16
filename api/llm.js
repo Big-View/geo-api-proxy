@@ -1,5 +1,5 @@
 /**
- * API PROXY MULTI-CHANNEL - Version 2.5
+ * API PROXY MULTI-CHANNEL - Version 2.6
  * Routes :
  *   POST /api/llm      → interroge un canal (openai, anthropic, google, perplexity, google_overviews)
  *   POST /api/suggest  → suggère des prompts (brand, sector, angle) via Claude
@@ -7,7 +7,10 @@
  *   GET  /api/history  → lit l'historique (?brand=&days=&limit=)
  *   GET  /api/sov      → Share of Voice agrégé depuis l'historique (?brand=&days=&provider=)
  *   POST /api/sov      → Share of Voice agrégé sur des lignes fournies ({ brand, rows[] })
- *   GET  /api/export   → export ?format=csv|pdf|slides (&brand=&days=&provider=) depuis l'historique
+ *   GET  /api/export   → export ?format=csv|pdf|slides&brand= (&run=latest|<id> par défaut, ou &days=)
+ *   GET  /api/runs     → études d'une marque et leurs indicateurs (?brand=&limit=)
+ *   GET  /api/runs/last → prompts / concurrents de la dernière étude, pour la relancer (?brand=)
+ *   GET  /api/progress → étude comparée à la précédente, global et par prompt (?brand=&run=)
  *   POST /api/export   → export { format, brand, rows[] } sur des lignes fournies
  *   GET  /api/health   → état de la config
  *
@@ -190,7 +193,10 @@ module.exports = function(app) {
   });
 
   // ---------- Exports CSV / PDF / Google Slides ----------
-  require('./export.js')(app, { checkAuth, historyConfigured, readSovRows, sovFilters, aggregateShareOfVoice });
+  require('./export.js')(app, { checkAuth, historyConfigured, readSovRows, readRunRows, sovFilters, aggregateShareOfVoice, normalize });
+
+  // ---------- Études : relancer les mêmes prompts, progression ----------
+  require('./runs.js')(app, { checkAuth, historyConfigured, readRunRows, aggregateShareOfVoice, normalize });
 };
 
 // =====================================================
@@ -223,9 +229,19 @@ async function readHistory({ select, order, limit, since, brand, provider }) {
   }
 }
 
+// Toutes les lignes d'une marque sur 1 an, pour reconstituer ses études (run_id)
+function readRunRows({ brand, withExcerpt = true }) {
+  return readHistory({
+    select: `created_at,run_id,brand,competitors,sector,angle,prompt,provider,mentioned,mentions,has_ai_overview,error${withExcerpt ? ',excerpt' : ''}`,
+    order: 'created_at.asc', limit: 5000,
+    since: new Date(Date.now() - 365 * 86400000).toISOString(),
+    brand
+  });
+}
+
 function readSovRows({ brand, provider, days }) {
   return readHistory({
-    select: 'created_at,run_id,brand,competitors,prompt,provider,mentioned,mentions,has_ai_overview,error',
+    select: 'created_at,run_id,brand,competitors,prompt,provider,mentioned,mentions,has_ai_overview,error,excerpt',
     order: 'created_at.asc', limit: 5000,
     since: new Date(Date.now() - days * 86400000).toISOString(),
     brand, provider
