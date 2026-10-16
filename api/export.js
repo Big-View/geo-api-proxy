@@ -370,11 +370,11 @@ function textBox(id, page, x, y, w, h, text, style = {}) {
   return [
     { createShape: { objectId: id, shapeType: 'TEXT_BOX', elementProperties: { pageObjectId: page, size: { width: PT(w), height: PT(h) }, transform: { scaleX: 1, scaleY: 1, translateX: x, translateY: y, unit: 'PT' } } } },
     { insertText: { objectId: id, text } },
-    { updateTextStyle: { objectId: id, fields: 'fontSize,bold,foregroundColor,fontFamily', style: {
+    { updateTextStyle: { objectId: id, textRange: { type: 'ALL' }, fields: 'fontSize,bold,foregroundColor,fontFamily', style: {
       fontSize: PT(style.size || 14), bold: !!style.bold, fontFamily: style.font || 'Poppins',
       foregroundColor: { opaqueColor: { rgbColor: hexRgb(style.color || INK) } }
     } } },
-    ...(style.align ? [{ updateParagraphStyle: { objectId: id, fields: 'alignment', style: { alignment: style.align } } }] : [])
+    ...(style.align ? [{ updateParagraphStyle: { objectId: id, textRange: { type: 'ALL' }, fields: 'alignment', style: { alignment: style.align } } }] : [])
   ];
 }
 function rect(id, page, x, y, w, h, color) {
@@ -390,13 +390,13 @@ function slideTable(id, page, header, rows, y = 90) {
   const reqs = [{ createTable: { objectId: id, rows: all.length, columns: header.length, elementProperties: {
     pageObjectId: page, size: { width: PT(640), height: PT(24 * all.length) }, transform: { scaleX: 1, scaleY: 1, translateX: 40, translateY: y, unit: 'PT' }
   } } }];
+  // Sur un tableau, l'API Slides exige un style par cellule (cellLocation obligatoire)
   all.forEach((r, ri) => r.forEach((c, ci) => {
-    reqs.push({ insertText: { objectId: id, cellLocation: { rowIndex: ri, columnIndex: ci }, text: String(c == null || c === '' ? '-' : c) } });
+    const cellLocation = { rowIndex: ri, columnIndex: ci };
+    reqs.push({ insertText: { objectId: id, cellLocation, text: String(c == null || c === '' ? '-' : c) } });
+    reqs.push({ updateTextStyle: { objectId: id, cellLocation, textRange: { type: 'ALL' }, fields: 'fontSize,fontFamily,bold',
+      style: { fontSize: PT(10), fontFamily: 'Roboto', bold: ri === 0 } } });
   }));
-  reqs.push({ updateTextStyle: { objectId: id, textRange: { type: 'ALL' }, fields: 'fontSize,fontFamily', style: { fontSize: PT(10), fontFamily: 'Roboto' } } });
-  for (let ci = 0; ci < header.length; ci++) {
-    reqs.push({ updateTextStyle: { objectId: id, cellLocation: { rowIndex: 0, columnIndex: ci }, textRange: { type: 'ALL' }, fields: 'bold', style: { bold: true } } });
-  }
   reqs.push({ updateTableCellProperties: { objectId: id, tableRange: { location: { rowIndex: 0, columnIndex: 0 }, rowSpan: 1, columnSpan: header.length },
     fields: 'tableCellBackgroundFill.solidFill.color', tableCellProperties: { tableCellBackgroundFill: { solidFill: { color: { rgbColor: hexRgb('#F0FAF6') } } } } } });
   return reqs;
@@ -493,7 +493,13 @@ async function createSlides(report, shareWith) {
   // Supprime la diapositive vide créée par défaut
   for (const sl of pres.slides || []) reqs.push({ deleteObject: { objectId: sl.objectId } });
 
-  await gapi(token, 'POST', `https://slides.googleapis.com/v1/presentations/${presentationId}:batchUpdate`, { requests: reqs });
+  try {
+    await gapi(token, 'POST', `https://slides.googleapis.com/v1/presentations/${presentationId}:batchUpdate`, { requests: reqs });
+  } catch (e) {
+    // Ne pas laisser une présentation vide dans le dossier si la mise en forme échoue
+    await gapi(token, 'DELETE', `https://www.googleapis.com/drive/v3/files/${presentationId}?supportsAllDrives=true`).catch(() => {});
+    throw e;
+  }
 
   const emails = [...String(shareWith || '').split(','), ...String(process.env.GOOGLE_SLIDES_SHARE_WITH || DEFAULT_SHARE_WITH).split(',')]
     .map(e => e.trim()).filter(e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));
