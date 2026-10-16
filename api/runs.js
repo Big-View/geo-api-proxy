@@ -115,6 +115,8 @@ function runSummary(run, brand, aggregate) {
     avgRank: f.avgRank ?? null,
     firstCitedRate: f.firstCitedRate ?? null,
     sentimentScore: f.sentimentScore ?? null,
+    sentimentLevel: f.sentimentLevel ?? null,
+    sentimentLevels: f.sentimentLevels ?? null,
     position: f.position ?? null
   };
 }

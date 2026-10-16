@@ -1,8 +1,5 @@
-﻿const express = require("express");
+const express = require("express");
 const app = express();
-
-// Middleware
-app.use(express.json());
 
 // CORS
 app.use((req, res, next) => {
@@ -16,6 +13,9 @@ app.use((req, res, next) => {
   
   next();
 });
+
+// Corps JSON : un run complet (prompts × canaux avec les réponses) dépasse la limite par défaut de 100 Ko
+app.use(express.json({ limit: "5mb" }));
 
 // Health check
 app.get("/", (req, res) => {

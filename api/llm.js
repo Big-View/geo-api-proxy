@@ -395,7 +395,7 @@ function enrichWithShareOfVoice(response, brands) {
 // Agrégation multi-réponses. Lignes au format geo_runs : { brand, provider, prompt, mentions{}, error, created_at }
 function aggregateShareOfVoice(rows, focusBrand) {
   const valid = (rows || []).filter(r => r && !r.error && r.mentions && typeof r.mentions === 'object');
-  const blank = () => ({ mentions: 0, responsesWithMention: 0, mostMentioned: 0, rankSum: 0, rankCount: 0, citedFirst: 0, sentSum: 0, sentCount: 0, positive: 0, neutral: 0, negative: 0 });
+  const blank = () => ({ mentions: 0, responsesWithMention: 0, mostMentioned: 0, rankSum: 0, rankCount: 0, citedFirst: 0, sentSum: 0, sentCount: 0, positive: 0, neutral: 0, negative: 0, levels: emptyLevels() });
   const totals = {}, byProvider = {}, byWeek = {};
   let responsesWithAnyBrand = 0;
 
@@ -409,6 +409,8 @@ function aggregateShareOfVoice(rows, focusBrand) {
       b[sent.label]++;
       b.sentSum += Number(sent.score) || 0;
       b.sentCount++;
+      const lv = levelOf(Number(sent.score) || 0);
+      if (lv) b.levels[lv.key]++;
     }
   };
 
@@ -447,7 +449,10 @@ function aggregateShareOfVoice(rows, focusBrand) {
         avgRank: b.rankCount ? round1(b.rankSum / b.rankCount) : null,
         firstCitedRate: b.rankCount ? round1((b.citedFirst / b.rankCount) * 100) : null,
         sentimentScore: b.sentCount ? Math.round((b.sentSum / b.sentCount) * 100) / 100 : null,
-        sentiment: { positive: b.positive, neutral: b.neutral, negative: b.negative }
+        sentiment: { positive: b.positive, neutral: b.neutral, negative: b.negative },
+        // 5 niveaux (très positif → très négatif) et niveau du sentiment général
+        sentimentLevels: b.levels,
+        sentimentLevel: b.sentCount ? levelOf(b.sentSum / b.sentCount).key : null
       }))
       .sort((a, b) => b.shareOfVoice - a.shareOfVoice || b.mentionRate - a.mentionRate);
   };
@@ -481,12 +486,13 @@ function isoWeek(d) {
 // Sentiment par marque (Claude, sortie JSON structurée)
 // =====================================================
 const SENTIMENT_LABELS = ['positive', 'neutral', 'negative'];
+const { levelOf, emptyLevels } = require('./sentiment-level.js');
 
 async function analyzeSentiment(text, brandNames, query) {
   const apiKey = process.env.API_KEY_ANTHROPIC;
   if (!apiKey) throw new Error('Anthropic API key not configured');
 
-  const system = `Tu analyses la façon dont une réponse d'assistant IA ou de moteur de recherche parle de marques. Pour chaque marque demandée, évalue le ton employé À SON SUJET dans la réponse, pas le ton général : positive (recommandée, mise en avant, qualités soulignées), neutral (simplement citée, listée sans jugement), negative (critiquée, déconseillée, défauts soulignés). score va de -1 (très négatif) à 1 (très positif), 0 = neutre. reason : une phrase courte en français citant l'élément du texte qui justifie le jugement.`;
+  const system = `Tu analyses la façon dont une réponse d'assistant IA ou de moteur de recherche parle de marques. Pour chaque marque demandée, évalue le ton employé À SON SUJET dans la réponse, pas le ton général : positive (recommandée, mise en avant, qualités soulignées), neutral (simplement citée, listée sans jugement), negative (critiquée, déconseillée, défauts soulignés). score va de -1 à 1 selon cette échelle : très positif ≥ 0,6 (recommandée en priorité, éloges appuyés) ; positif 0,2 à 0,6 (présentée favorablement) ; neutre / informatif entre -0,2 et 0,2 (citée de façon factuelle, sans jugement) ; négatif -0,6 à -0,2 (réserves, points faibles) ; très négatif ≤ -0,6 (critiquée, déconseillée). reason : une phrase courte en français citant l'élément du texte qui justifie le jugement.`;
   const user = `Question posée : ${String(query || '').slice(0, 500)}
 
 Marques à évaluer : ${brandNames.join(', ')}
