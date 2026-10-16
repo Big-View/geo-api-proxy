@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GEO Share of Voice - Big View</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@700;800&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --primary: #04D99D;
+            --primary-dark: #02c288;
+            --accent: #F3D604;
+            --dark: #000000;
+            --light: #FFFFFF;
+            --text: #595959;
+            --text-bold: #000000;
+            --bg-light: #F8F9FA;
+            --border: #E0E0E0;
+            --light-green: #F0FAF6;
+            --red: #d32f2f;
+            --red-light: #ffe8e8;
+        }
+
+        body {
+            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-light);
+            min-height: 100vh;
+            padding: 20px;
+            color: var(--text);
+            line-height: 1.6;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        /* Header */
+        header {
+            background: var(--light);
+            border-top: 6px solid var(--primary);
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 30px;
+        }
+        .header-logo {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 60px; height: 60px; background: #fff; border: 2px solid var(--primary); border-radius: 8px;
+            font-weight: 800; color: var(--dark); font-size: 24px;
+            font-family: 'Raleway', sans-serif; margin-bottom: 12px; overflow: hidden;
+        }
+        .header-logo img { width: 100%; height: 100%; object-fit: contain; }
+        .header-content { flex: 1; }
+        .header-label {
+            font-size: 0.85em; color: var(--primary); font-weight: 700;
+            text-transform: uppercase; letter-spacing: 1px;
+            font-family: 'Raleway', sans-serif; margin-bottom: 6px;
+        }
+        h1 { font-size: 2.2em; color: var(--text-bold); margin-bottom: 6px; font-weight: 800; font-family: 'Raleway', sans-serif; }
+        .tagline { font-size: 1.05em; color: var(--text); }
+        .hero-badge {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: var(--dark); padding: 24px 30px; border-radius: 8px; text-align: center; min-width: 260px;
+        }
+        .badge-number { font-size: 3em; font-weight: 800; font-family: 'Raleway', sans-serif; margin: 6px 0; line-height: 1; }
+        .badge-text { font-size: 0.95em; font-weight: 700; font-family: 'Raleway', sans-serif; }
+
+        /* Layout */
+        .main-content { display: grid; grid-template-columns: 1fr 2fr; gap: 30px; margin-bottom: 30px; }
+        .card {
+            background: var(--light); border-radius: 8px; padding: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid var(--border);
+            margin-bottom: 30px;
+        }
+        .main-content .card { margin-bottom: 0; }
+        .section-title {
+            display: flex; align-items: center; gap: 12px; color: var(--primary);
+            margin-bottom: 20px; font-size: 1.2em; font-weight: 800; font-family: 'Raleway', sans-serif;
+        }
+        .section-title::after {
+            content: ""; flex: 1; height: 3px;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%); border-radius: 2px;
+        }
+        .section-title .count {
+            font-size: 0.7em; background: var(--accent); color: var(--dark);
+            padding: 2px 10px; border-radius: 20px; font-family: 'Roboto', sans-serif; font-weight: 700;
+        }
+
+        /* Angles */
+        .template-cards { display: flex; flex-direction: column; gap: 10px; }
+        .template-card {
+            padding: 12px 14px; border: 2px solid var(--border); border-left: 4px solid transparent;
+            border-radius: 6px; cursor: pointer; transition: all 0.2s ease; background: var(--bg-light);
+        }
+        .template-card:hover { border-color: var(--primary); border-left-color: var(--primary); background: var(--light-green); }
+        .template-card.active { border-color: var(--primary); border-left-color: var(--primary); background: var(--light-green); }
+        .template-name { color: var(--primary); font-weight: 700; margin-bottom: 2px; font-family: 'Raleway', sans-serif; font-size: 0.95em; }
+        .template-desc { color: var(--text); font-size: 0.88em; }
+
+        /* Form */
+        .form-group { margin-bottom: 18px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        label { display: block; color: var(--primary); font-weight: 700; margin-bottom: 8px; font-size: 0.95em; font-family: 'Raleway', sans-serif; }
+        label .hint { color: var(--text); font-weight: 400; font-family: 'Roboto', sans-serif; font-size: 0.9em; }
+        input[type="text"], textarea, select {
+            width: 100%; padding: 11px; border: 1px solid var(--border); border-radius: 6px;
+            font-family: 'Roboto', sans-serif; font-size: 0.95em; color: var(--text); background: var(--light);
+            transition: all 0.2s ease;
+        }
+        input[type="text"]:focus, textarea:focus, select:focus {
+            outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(4, 217, 157, 0.1);
+        }
+        textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
+
+        .channels-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(115px, 1fr)); gap: 12px; margin-top: 10px; }
+        .channel-checkbox {
+            display: flex; align-items: center; gap: 8px; padding: 10px; border: 2px solid var(--border);
+            border-radius: 6px; cursor: pointer; transition: all 0.2s ease; background: var(--light);
+        }
+        .channel-checkbox:hover { border-color: var(--primary); background: var(--light-green); }
+        .channel-checkbox input { cursor: pointer; width: 18px; height: 18px; accent-color: var(--primary); }
+        .channel-checkbox label { margin: 0; cursor: pointer; font-weight: 500; color: var(--text-bold); font-family: 'Roboto', sans-serif; }
+
+        /* Buttons */
+        .button-group { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+        button {
+            padding: 12px 18px; border: none; border-radius: 6px; font-size: 0.92em; font-weight: 700;
+            cursor: pointer; transition: all 0.2s ease; font-family: 'Raleway', sans-serif;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        button:disabled { opacity: 0.6; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+        .btn-analyze { flex: 1; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: var(--dark); }
+        .btn-analyze:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(4, 217, 157, 0.3); }
+        .btn-clear { background: var(--accent); color: var(--text-bold); }
+        .btn-secondary { background: var(--light); color: var(--text-bold); border: 2px solid var(--primary); }
+        .btn-secondary:hover:not(:disabled) { background: var(--light-green); }
+        .btn-small { padding: 8px 14px; font-size: 0.8em; }
+
+        /* Suggestions */
+        .suggest-box { margin-top: 12px; border: 1px dashed var(--primary); border-radius: 6px; padding: 12px; background: var(--light-green); display: none; }
+        .suggest-box.visible { display: block; }
+        .suggest-item { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .suggest-item:last-child { border-bottom: none; }
+        .suggest-item input { margin-top: 4px; accent-color: var(--primary); width: 16px; height: 16px; flex-shrink: 0; }
+        .suggest-item span { color: var(--text-bold); font-size: 0.93em; }
+        .suggest-actions { display: flex; gap: 10px; margin-top: 10px; }
+
+        /* Reprise de la dernière étude */
+        .reuse-hint { display: none; align-items: center; gap: 12px; flex-wrap: wrap; margin: -6px 0 18px; padding: 10px 14px; border-radius: 6px; background: rgba(243,214,4,.18); border-left: 4px solid var(--accent); font-size: 0.9em; color: var(--text-bold); }
+        .reuse-hint.visible { display: flex; }
+        .reuse-hint span { flex: 1; }
+
+        /* Info */
+        .info-box {
+            background: linear-gradient(135deg, rgba(4,217,157,0.08) 0%, rgba(243,214,4,0.08) 100%);
+            border-left: 4px solid var(--primary); padding: 12px 14px; border-radius: 6px;
+            margin-bottom: 16px; font-size: 0.9em; color: var(--text);
+        }
+        .info-box strong { color: var(--primary); font-family: 'Raleway', sans-serif; }
+
+        /* Progress */
+        .progress-wrap { margin: 10px 0 18px; display: none; }
+        .progress-wrap.visible { display: block; }
+        .progress-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--primary), var(--accent)); transition: width 0.3s; }
+        .progress-label { font-size: 0.85em; margin-top: 6px; }
+
+        /* Matrix */
+        .table-wrap { overflow-x: auto; }
+        table.matrix { width: 100%; border-collapse: collapse; font-size: 0.92em; }
+        table.matrix th, table.matrix td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: center; vertical-align: middle; }
+        table.matrix th { color: var(--text-bold); font-family: 'Raleway', sans-serif; font-weight: 700; background: var(--bg-light); white-space: nowrap; }
+        table.matrix td.prompt-cell { text-align: left; color: var(--text-bold); min-width: 260px; max-width: 480px; }
+        table.matrix td.prompt-cell small { display: block; color: var(--text); font-size: 0.85em; }
+        .cell { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; padding: 5px 10px; border-radius: 20px; font-weight: 700; cursor: pointer; font-size: 0.9em; }
+        .cell.yes { background: var(--primary); color: var(--dark); }
+        .cell.no { background: var(--border); color: var(--text); }
+        .cell.err { background: var(--red-light); color: var(--red); }
+        .cell.pending { background: transparent; color: var(--text); }
+        .cell:hover { filter: brightness(0.95); }
+        .cell .rank { font-size: 0.8em; margin-left: 4px; }
+        .cell .sent { width: 8px; height: 8px; border-radius: 50%; margin-left: 5px; display: inline-block; }
+        .sent.positive { background: #00805a; } .sent.neutral { background: #9e9e9e; } .sent.negative { background: var(--red); }
+        .score-cell { font-weight: 700; color: var(--text-bold); }
+        tr.total td { background: var(--light-green); font-weight: 700; color: var(--text-bold); }
+
+        /* Detail panel */
+        .detail { margin-top: 18px; border-left: 4px solid var(--primary); background: var(--light-green); border-radius: 6px; padding: 16px; display: none; }
+        .detail.visible { display: block; }
+        .detail.err { border-left-color: var(--red); background: var(--red-light); }
+        .detail-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .detail-title { font-family: 'Raleway', sans-serif; font-weight: 700; color: var(--text-bold); }
+        .detail-meta { font-size: 0.85em; color: var(--text); }
+        .detail-text { white-space: pre-wrap; line-height: 1.7; font-size: 0.93em; max-height: 420px; overflow: auto; }
+        .detail-text mark { background: var(--accent); color: var(--dark); padding: 0 3px; border-radius: 3px; }
+        .detail-text mark.comp { background: #ffe0b2; }
+        .close-btn { background: none; border: none; font-size: 1.3em; cursor: pointer; color: var(--text); padding: 0 6px; text-transform: none; }
+
+        /* Legend */
+        .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.85em; margin-bottom: 12px; }
+        .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+        .legend .l-yes::before { background: var(--primary); }
+        .legend .l-no::before { background: var(--border); }
+        .legend .l-err::before { background: var(--red-light); border: 1px solid var(--red); }
+
+        /* History */
+        .history-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 16px; }
+        .history-controls .form-group { margin: 0; flex: 1; min-width: 180px; }
+        .chart-wrap { position: relative; height: 300px; margin-bottom: 20px; }
+        .history-empty { text-align: center; padding: 30px; color: var(--text); }
+        .pill { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; font-weight: 700; }
+        .pill.on { background: var(--primary); color: var(--dark); }
+        .pill.off { background: var(--border); color: var(--text); }
+        .pill.local { background: var(--accent); color: var(--dark); }
+        .pill.err { background: var(--red); color: #fff; }
+        .proxy-status { display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 0.85em; color: var(--text); }
+        .proxy-status .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); }
+        .proxy-status.ok .dot { background: var(--primary); }
+        .proxy-status.ko .dot { background: var(--red); }
+        .proxy-status.warn .dot { background: var(--accent); }
+        .save-status { margin: 12px 0 16px; padding: 10px 14px; border-radius: 6px; font-size: 0.9em; display: none; }
+        .save-status.visible { display: block; }
+        .save-status.ok { background: rgba(4,217,157,.12); border-left: 4px solid var(--primary); }
+        .save-status.local { background: rgba(243,214,4,.15); border-left: 4px solid var(--accent); }
+        .save-status.err { background: rgba(255,0,0,.06); border-left: 4px solid var(--red); }
+        .cell.noaio { background: #f1f1f1; color: #999; border: 1px dashed #ccc; }
+        .l-noaio::before { background: #f1f1f1; border: 1px dashed #ccc; }
+
+        /* Progression étude par étude */
+        .progress-block { margin-bottom: 24px; }
+        .progress-head { font-family: 'Raleway', sans-serif; font-weight: 700; color: var(--text-bold); margin-bottom: 12px; }
+        .progress-head small { font-family: 'Roboto', sans-serif; font-weight: 400; color: var(--text); margin-left: 8px; }
+        .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .kpi { background: var(--light-green); border-radius: 8px; padding: 14px; text-align: center; }
+        .kpi-value { font-family: 'Raleway', sans-serif; font-weight: 800; font-size: 1.6em; color: var(--text-bold); line-height: 1.1; }
+        .kpi-label { font-size: 0.82em; margin-top: 4px; }
+        .kpi-delta { font-size: 0.85em; font-weight: 700; margin-top: 6px; }
+        .up { color: var(--primary-dark); } .down { color: var(--red); } .same { color: var(--text); }
+        .trend { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 0.75em; font-weight: 700; margin-left: 4px; }
+        .trend.gagné, .trend.en.hausse { background: rgba(4,217,157,.18); color: #00805a; }
+        .trend.perdu, .trend.en.baisse { background: var(--red-light); color: var(--red); }
+
+        /* Exports */
+        .export-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 4px 0 18px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-light); }
+        .export-bar strong { font-family: 'Raleway', sans-serif; color: var(--text-bold); margin-right: 6px; }
+        .export-status { font-size: 0.88em; flex-basis: 100%; }
+        .export-status a { color: var(--primary-dark); font-weight: 700; }
+
+        .empty-state { text-align: center; padding: 50px 20px; color: var(--text); }
+        .empty-state-icon { font-size: 3em; margin-bottom: 12px; opacity: 0.5; }
+        .spinner {
+            display: inline-block; width: 16px; height: 16px; border: 2px solid #f0f0f0;
+            border-top: 2px solid var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite;
+            margin-right: 8px; vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .toast { position: fixed; bottom: 20px; right: 20px; background: var(--dark); color: var(--light); padding: 12px 18px; border-radius: 6px; font-size: 0.9em; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 99; }
+        .toast.show { opacity: 1; }
+
+        .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 0.9em; }
+        .footer-logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-family: 'Raleway', sans-serif; }
+
+        @media (max-width: 900px) {
+            header { flex-direction: column; text-align: center; }
+            .main-content { grid-template-columns: 1fr; }
+            .form-row { grid-template-columns: 1fr; }
+            h1 { font-size: 1.5em; }
+            .channels-grid { grid-template-columns: repeat(2, 1fr); }
+            .button-group { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div class="header-logo"><img src="https://geo-api-proxy.onrender.com/assets/logo-bigview.png" alt="BV" onerror="this.replaceWith('BV')"></div>
+                <div class="header-label">Big View</div>
+                <h1>GEO Share of Voice</h1>
+                <p class="tagline">L'IA accélère, l'expérience pilote.</p>
+                <div class="proxy-status" id="proxyStatus"><span class="dot"></span><span id="proxyStatusText">Vérification du proxy…</span></div>
+            </div>
+            <div class="hero-badge">
+                <div class="badge-text">Analysez</div>
+                <div class="badge-number">5</div>
+                <div class="badge-text">canaux IA en parallèle</div>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Angles -->
+            <div class="card">
+                <div class="section-title">📋 Angles de prompts</div>
+                <div class="info-box">
+                    <strong>Conseil Big View :</strong> pour suivre une progression, relancez les mêmes prompts d'une étude à l'autre (« Reprendre la dernière étude »). Pour une nouvelle étude, choisissez un angle puis « Suggérer des prompts ».
+                </div>
+                <div class="template-cards">
+                    <div class="template-card active" data-angle="direct">
+                        <div class="template-name">Question directe</div>
+                        <div class="template-desc">Formulation simple et neutre</div>
+                    </div>
+                    <div class="template-card" data-angle="expert">
+                        <div class="template-name">Expert</div>
+                        <div class="template-desc">Critères de choix, crédibilité</div>
+                    </div>
+                    <div class="template-card" data-angle="data">
+                        <div class="template-name">Data-driven</div>
+                        <div class="template-desc">Chiffres, benchmarks, preuves</div>
+                    </div>
+                    <div class="template-card" data-angle="recommendation">
+                        <div class="template-name">Recommandation</div>
+                        <div class="template-desc">Demande d'avis ou de conseil</div>
+                    </div>
+                    <div class="template-card" data-angle="comparison">
+                        <div class="template-name">Comparatif</div>
+                        <div class="template-desc">Face à face avec les concurrents</div>
+                    </div>
+                    <div class="template-card" data-angle="custom">
+                        <div class="template-name">Personnalisé</div>
+                        <div class="template-desc">Mélange d'intentions, ou vos propres prompts</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configuration -->
+            <div class="card">
+                <div class="section-title">⚙️ Configuration</div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Marque à surveiller</label>
+                        <input type="text" id="brandInput" placeholder="Big View" value="Big View">
+                    </div>
+                    <div class="form-group">
+                        <label>Secteur / offre <span class="hint">(aide la suggestion)</span></label>
+                        <input type="text" id="sectorInput" placeholder="agence SEO et GEO pour PME, Paris / Nantes…">
+                    </div>
+                </div>
+                <div class="reuse-hint" id="reuseHint">
+                    <span id="reuseHintText"></span>
+                    <button class="btn-secondary btn-small" id="reuseHintBtn">↺ Reprendre ces prompts</button>
+                </div>
+                <div class="form-group">
+                    <label>Localisation Google Overviews <span style="font-weight:400">(optionnel — ex. « Montpellier, France » : simule une recherche depuis cette ville)</span></label>
+                    <input type="text" id="locationInput" placeholder="Montpellier, Occitanie, France">
+                </div>
+
+                <div class="form-group">
+                    <label>Concurrents à suivre <span class="hint">(séparés par des virgules, facultatif)</span></label>
+                    <input type="text" id="competitorsInput" placeholder="Eskimoz, Primelis, Ekko Media…">
+                </div>
+
+                <div class="form-group">
+                    <label>Prompts à tester <span class="hint">(un par ligne, [BRAND] sera remplacé par la marque)</span></label>
+                    <textarea id="promptsInput" placeholder="Quelle agence SEO choisir pour une PME à Nantes ?&#10;Quels sont les meilleurs experts GEO en France ?">Quelles sont les meilleures agences SEO et GEO pour une PME en France ?</textarea>
+                    <div class="button-group" style="margin-top:10px;">
+                        <button class="btn-secondary btn-small" id="suggestBtn">✨ Suggérer des prompts</button>
+                        <button class="btn-secondary btn-small" id="reuseBtn">↺ Reprendre la dernière étude</button>
+                    </div>
+                    <div class="suggest-box" id="suggestBox">
+                        <div id="suggestList"></div>
+                        <div class="suggest-actions">
+                            <button class="btn-analyze btn-small" id="addSuggestedBtn">Ajouter la sélection</button>
+                            <button class="btn-secondary btn-small" id="closeSuggestBtn">Fermer</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Canaux à analyser</label>
+                    <div class="channels-grid">
+                        <div class="channel-checkbox"><input type="checkbox" id="ch-openai" checked><label for="ch-openai">ChatGPT</label></div>
+                        <div class="channel-checkbox"><input type="checkbox" id="ch-anthropic" checked><label for="ch-anthropic">Claude</label></div>
+                        <div class="channel-checkbox"><input type="checkbox" id="ch-google" checked><label for="ch-google">Gemini</label></div>
+                        <div class="channel-checkbox"><input type="checkbox" id="ch-perplexity" checked><label for="ch-perplexity">Perplexity</label></div>
+                        <div class="channel-checkbox"><input type="checkbox" id="ch-google_overviews" checked><label for="ch-google_overviews">Google<br>Overviews</label></div>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-analyze" id="analyzeBtn">🚀 Lancer l'analyse</button>
+                    <button class="btn-clear" id="clearBtn">↻ Réinitialiser</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Résultats -->
+        <div class="card">
+            <div class="section-title">📊 Résultats <span class="count" id="resultsCount" style="display:none;"></span></div>
+            <div class="progress-wrap" id="progressWrap">
+                <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                <div class="progress-label" id="progressLabel"></div>
+            </div>
+            <div id="resultsContainer">
+                <div class="empty-state">
+                    <div class="empty-state-icon">📈</div>
+                    <p>Lancez une analyse pour voir votre positionnement dans les réponses IA</p>
+                </div>
+            </div>
+            <div class="detail" id="detailPanel">
+                <div class="detail-head">
+                    <div>
+                        <div class="detail-title" id="detailTitle"></div>
+                        <div class="detail-meta" id="detailMeta"></div>
+                    </div>
+                    <button class="close-btn" id="detailClose" title="Fermer">✕</button>
+                </div>
+                <div class="detail-text" id="detailText"></div>
+            </div>
+        </div>
+
+        <!-- Historique -->
+        <div class="card">
+            <div class="section-title">📅 Historique de visibilité <span class="pill off" id="historyStatus">…</span></div>
+            <div class="save-status" id="saveStatus"></div>
+            <div class="history-controls">
+                <div class="form-group">
+                    <label>Marque</label>
+                    <input type="text" id="historyBrand" placeholder="Marque analysée (reprend la configuration)">
+                </div>
+                <div class="form-group">
+                    <label>Prompt</label>
+                    <select id="historyPrompt"><option value="">Tous les prompts (moyenne)</option></select>
+                </div>
+                <div class="form-group">
+                    <label>Période</label>
+                    <select id="historyDays">
+                        <option value="30">30 jours</option>
+                        <option value="90" selected>90 jours</option>
+                        <option value="365">1 an</option>
+                    </select>
+                </div>
+                <button class="btn-secondary btn-small" id="historyRefresh">Actualiser</button>
+            </div>
+
+            <div class="export-bar">
+                <strong>Exporter la dernière étude</strong>
+                <button class="btn-secondary btn-small" data-export="csv">⬇ CSV détaillé</button>
+                <button class="btn-secondary btn-small" data-export="csv" data-type="summary">⬇ CSV synthèse</button>
+                <button class="btn-secondary btn-small" data-export="pdf">⬇ Rapport PDF</button>
+                <button class="btn-analyze btn-small" data-export="slides" style="flex:0 0 auto">📊 Google Slides</button>
+                <div class="export-status" id="exportStatus"></div>
+            </div>
+
+            <div class="progress-block" id="progressBlock"></div>
+            <div class="chart-wrap"><canvas id="historyChart"></canvas></div>
+            <div class="table-wrap" id="historyTable"></div>
+        </div>
+
+        <div class="footer">
+            <div class="footer-logo">
+                <span style="background:#fff;color:#000;border:2px solid #04D99D;padding:2px 6px;border-radius:4px;font-weight:800;">BV</span>
+                Big View — L'IA accélère, l'expérience pilote.
+            </div>
+        </div>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ⚡ CONFIGURATION ⚡
+        const PROXY_BASE = 'https://geo-api-proxy.onrender.com';
+        const VALID_TOKEN = 'XXXXXXXXXXXXXX'; // ⚠️ remettre ici le token (identique à TEAM_TOKEN sur Render)
+        const CONCURRENCY = 3; // appels simultanés vers le proxy
+
+        const PROVIDERS = [
+            { id: 'openai', name: 'ChatGPT', icon: '🤖' },
+            { id: 'anthropic', name: 'Claude', icon: '🧠' },
+            { id: 'google', name: 'Gemini', icon: '🔵' },
+            { id: 'perplexity', name: 'Perplexity', icon: '🔎' },
+            { id: 'google_overviews', name: 'Google Overviews', icon: '📰' }
+        ];
+        const providerById = Object.fromEntries(PROVIDERS.map(p => [p.id, p]));
+        const providerName = id => (providerById[id] ? providerById[id].name : id);
+        const ANGLE_NAMES = { direct: 'Question directe', expert: 'Expert', data: 'Data-driven', recommendation: 'Recommandation', comparison: 'Comparatif', custom: 'Personnalisé' };
+        const SENTIMENT_FR = { positive: 'Positif', neutral: 'Neutre', negative: 'Négatif' };
+
+        // State
+        let currentAngle = 'direct';
+        let results = {};       // key prompt|provider -> {status, data, mentioned, mentions, stats, error}
+        let currentRun = null;  // {id, brand, competitors, prompts, providers, sector, angle}
+        let historyMode = 'unknown'; // 'server' | 'local' | 'unknown'
+        let historyChart = null;
+        let historyBrandEdited = false; // l'utilisateur a saisi une marque dans l'historique
+        let proxyHealth = null;
+        let pendingRows = null; // dernières lignes non enregistrées côté serveur
+        let lastStudy = null;   // dernière étude connue pour la marque saisie (pour la reprise)
+
+        // Elements
+        const $ = id => document.getElementById(id);
+        const brandInput = $('brandInput'), sectorInput = $('sectorInput'), competitorsInput = $('competitorsInput');
+        const promptsInput = $('promptsInput'), analyzeBtn = $('analyzeBtn'), clearBtn = $('clearBtn');
+        const suggestBtn = $('suggestBtn'), suggestBox = $('suggestBox'), suggestList = $('suggestList');
+        const resultsContainer = $('resultsContainer'), progressWrap = $('progressWrap'), progressFill = $('progressFill'), progressLabel = $('progressLabel');
+        const detailPanel = $('detailPanel');
+
+        // ---------- Utils ----------
+        const normalize = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const fmtNum = v => v == null ? '–' : String(v).replace('.', ',');
+        const fmtDate = s => s ? new Date(s).toLocaleDateString('fr-FR') : '–';
+        function countMentions(text, names) {
+            const hay = normalize(text); const out = {};
+            for (const n of names) { const needle = normalize(n); if (!needle) continue; let c = 0, i = 0; while ((i = hay.indexOf(needle, i)) !== -1) { c++; i += needle.length; } out[n] = c; }
+            return out;
+        }
+        function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
+        function headers() { return { 'Content-Type': 'application/json', 'x-geo-token': VALID_TOKEN }; }
+        async function api(path, opts = {}) {
+            const r = await fetch(PROXY_BASE + path, { ...opts, headers: headers() });
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok) { const e = new Error(data.message || data.error || `Erreur ${r.status}`); e.status = r.status; e.data = data; throw e; }
+            return data;
+        }
+        function getPrompts(brand) {
+            return promptsInput.value.split('\n').map(l => l.trim()).filter(Boolean).map(p => p.replace(/\[BRAND\]/gi, brand));
+        }
+        function getCompetitors() {
+            const brand = normalize(brandInput.value.trim());
+            const seen = new Set();
+            return competitorsInput.value.split(',').map(s => s.trim()).filter(Boolean)
+                .filter(c => { const k = normalize(c); if (!k || k === brand || seen.has(k)) return false; seen.add(k); return true; });
+        }
+        function setAngle(angle) {
+            document.querySelectorAll('.template-card').forEach(c => c.classList.toggle('active', c.dataset.angle === angle));
+            currentAngle = angle;
+        }
+
+        // ---------- Statut du proxy ----------
+        async function checkProxy(silent) {
+            const el = $('proxyStatus'), txt = $('proxyStatusText');
+            el.className = 'proxy-status'; txt.textContent = 'Vérification du proxy…';
+            try {
+                const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 45000);
+                const h = await fetch(PROXY_BASE + '/api/health', { signal: ctrl.signal }).then(r => r.json());
+                clearTimeout(t); proxyHealth = h;
+                const ko = PROVIDERS.filter(p => h.providers && h.providers[p.id] === false).map(p => p.name);
+                if (ko.length) { el.classList.add('warn'); txt.textContent = `Proxy en ligne — canaux non configurés : ${ko.join(', ')}` + (h.history ? '' : ' — historique serveur désactivé'); }
+                else { el.classList.add('ok'); txt.textContent = 'Proxy en ligne — 5 canaux configurés' + (h.history ? ', historique serveur actif' : ' — historique serveur désactivé'); }
+                return h;
+            } catch (e) {
+                proxyHealth = null; el.classList.add('ko');
+                txt.textContent = 'Proxy injoignable (Render en veille ou hors ligne) — nouvelle tentative dans 30 s';
+                if (!silent) toast('Proxy injoignable : les appels vont échouer');
+                setTimeout(() => checkProxy(true), 30000);
+                return null;
+            }
+        }
+        function setSaveStatus(kind, msg) {
+            const el = $('saveStatus'); el.className = 'save-status visible ' + kind; el.innerHTML = msg;
+        }
+        function getSelectedProviders() { return PROVIDERS.filter(p => $('ch-' + p.id).checked).map(p => p.id); }
+
+        // ---------- Angles ----------
+        document.querySelectorAll('.template-card').forEach(card => {
+            card.addEventListener('click', () => setAngle(card.dataset.angle));
+        });
+
+        // ---------- Suggestions ----------
+        suggestBtn.addEventListener('click', async () => {
+            const brand = brandInput.value.trim();
+            if (!brand) return alert('Saisissez la marque à surveiller');
+            suggestBtn.disabled = true; suggestBtn.innerHTML = '<span class="spinner"></span>Génération…';
+            try {
+                const data = await api('/api/suggest', { method: 'POST', body: JSON.stringify({ brand, sector: sectorInput.value.trim(), angle: currentAngle, count: 6 }) });
+                suggestList.innerHTML = data.prompts.map((p, i) => `
+                    <div class="suggest-item"><input type="checkbox" id="sg-${i}" checked data-prompt="${esc(p)}"><span>${esc(p)}</span></div>`).join('');
+                suggestBox.classList.add('visible');
+            } catch (e) { alert('Suggestion impossible : ' + e.message); }
+            finally { suggestBtn.disabled = false; suggestBtn.textContent = '✨ Suggérer des prompts'; }
+        });
+        $('addSuggestedBtn').addEventListener('click', () => {
+            const chosen = [...suggestList.querySelectorAll('input:checked')].map(i => i.dataset.prompt);
+            const existing = promptsInput.value.split('\n').map(l => l.trim()).filter(Boolean);
+            const merged = [...existing, ...chosen.filter(c => !existing.includes(c))];
+            promptsInput.value = merged.join('\n');
+            suggestBox.classList.remove('visible');
+            toast(`${chosen.length} prompt(s) ajouté(s)`);
+        });
+        $('closeSuggestBtn').addEventListener('click', () => suggestBox.classList.remove('visible'));
+
+        // ---------- Reprise de la dernière étude ----------
+        async function fetchLastStudy(brand) {
+            if (!brand) return null;
+            try { const d = await api(`/api/runs/last?brand=${encodeURIComponent(brand)}`); return d.found ? d : null; }
+            catch { return null; }
+        }
+        async function proposeLastStudy() {
+            const brand = brandInput.value.trim();
+            lastStudy = await fetchLastStudy(brand);
+            const hint = $('reuseHint');
+            if (!lastStudy || brand !== brandInput.value.trim()) { hint.classList.remove('visible'); return; }
+            $('reuseHintText').textContent = `Dernière étude « ${brand} » le ${fmtDate(lastStudy.date)} : ${lastStudy.prompts.length} prompt(s), angle ${ANGLE_NAMES[lastStudy.angle] || lastStudy.angle || '–'}. Relancez les mêmes prompts pour mesurer la progression.`;
+            hint.classList.add('visible');
+        }
+        function applyStudy(d) {
+            promptsInput.value = d.prompts.join('\n');
+            competitorsInput.value = (d.competitors || []).join(', ');
+            if (d.sector) sectorInput.value = d.sector;
+            if (d.angle && ANGLE_NAMES[d.angle]) setAngle(d.angle);
+            if (d.providers && d.providers.length) PROVIDERS.forEach(p => { $('ch-' + p.id).checked = d.providers.includes(p.id); });
+            $('reuseHint').classList.remove('visible');
+            toast(`Étude du ${fmtDate(d.date)} reprise : ${d.prompts.length} prompt(s)`);
+        }
+        async function reuseLastStudy(btn) {
+            const brand = brandInput.value.trim();
+            if (!brand) return alert('Saisissez la marque à surveiller');
+            const label = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Chargement…';
+            try {
+                const d = (lastStudy && brand === brandInput.value.trim()) ? lastStudy : await fetchLastStudy(brand);
+                if (!d) return toast(`Aucune étude précédente pour « ${brand} »`);
+                applyStudy(d);
+            } finally { btn.disabled = false; btn.textContent = label; }
+        }
+        $('reuseBtn').addEventListener('click', e => reuseLastStudy(e.currentTarget));
+        $('reuseHintBtn').addEventListener('click', e => reuseLastStudy(e.currentTarget));
+
+        // ---------- Analyse ----------
+        analyzeBtn.addEventListener('click', async () => {
+            const brand = brandInput.value.trim();
+            if (!brand) return alert('Saisissez la marque à surveiller');
+            const prompts = getPrompts(brand);
+            if (!prompts.length) return alert('Saisissez au moins un prompt');
+            const providers = getSelectedProviders();
+            if (!providers.length) return alert('Sélectionnez au moins un canal');
+            if (prompts.length * providers.length > 60 && !confirm(`${prompts.length * providers.length} appels API vont être lancés. Continuer ?`)) return;
+
+            if (!proxyHealth) { const h = await checkProxy(false); if (!h) return alert('Le proxy ne répond pas. Réessayez dans 30 secondes (Render sort de veille).'); }
+            const competitors = getCompetitors();
+            $('saveStatus').className = 'save-status';
+            currentRun = { id: 'run_' + Date.now(), brand, competitors, prompts, providers, sector: sectorInput.value.trim(), angle: currentAngle, startedAt: new Date() };
+            results = {};
+            detailPanel.classList.remove('visible');
+            $('reuseHint').classList.remove('visible');
+            analyzeBtn.disabled = true; analyzeBtn.innerHTML = '<span class="spinner"></span>Analyse en cours…';
+            renderMatrix();
+
+            const jobs = [];
+            for (const prompt of prompts) for (const provider of providers) jobs.push({ prompt, provider });
+            const total = jobs.length; let done = 0;
+            progressWrap.classList.add('visible'); updateProgress(0, total);
+
+            const names = [brand, ...competitors];
+            const worker = async () => {
+                while (jobs.length) {
+                    const job = jobs.shift();
+                    const key = job.prompt + '|' + job.provider;
+                    try {
+                        const data = await api('/api/llm', { method: 'POST', body: JSON.stringify({ provider: job.provider, query: job.prompt, brands: names, location: $('locationInput').value.trim() || undefined }) });
+                        const content = typeof data.content === 'string' ? data.content : JSON.stringify(data.content);
+                        let mentions, stats = null, noAio = false;
+                        if (job.provider === 'google_overviews') {
+                            if (data.hasAiOverview && data.aiOverview) {
+                                const src = (data.aiOverviewSources || []).map(s => `${s.title || ''} ${s.source || ''} ${s.link || ''}`).join(' ');
+                                mentions = countMentions(data.aiOverview + '\n' + src, names);
+                                stats = data.brandStats || null;
+                            } else { noAio = true; mentions = Object.fromEntries(names.map(n => [n, 0])); }
+                        } else {
+                            // Détection du proxy : mot entier, séparateurs tolérés (« Big View » = « BigView »)
+                            mentions = data.brandMentions || countMentions(content, names);
+                            stats = data.brandStats || null;
+                        }
+                        results[key] = { status: 'ok', data, content, mentions, stats, mentioned: mentions[brand] > 0, noAio };
+                    } catch (e) {
+                        results[key] = { status: 'error', error: e.message, mentions: {}, mentioned: false };
+                    }
+                    done++; updateProgress(done, total); renderMatrix();
+                }
+            };
+            await Promise.all(Array.from({ length: Math.min(CONCURRENCY, total) }, worker));
+
+            analyzeBtn.disabled = false; analyzeBtn.textContent = "🚀 Lancer l'analyse";
+            progressLabel.textContent = `Terminé : ${total} réponses analysées`;
+            await saveRunToHistory();
+            loadHistory(true);
+        });
+
+        function updateProgress(done, total) {
+            progressFill.style.width = Math.round(done / total * 100) + '%';
+            progressLabel.textContent = `${done} / ${total} réponses reçues`;
+        }
+
+        // ---------- Matrice ----------
+        function renderMatrix() {
+            if (!currentRun) return;
+            const { brand, prompts, providers, competitors } = currentRun;
+            $('resultsCount').style.display = 'inline-block';
+            $('resultsCount').textContent = `${prompts.length} prompt(s) × ${providers.length} canal(aux)`;
+
+            let html = `<div class="legend"><span class="l-yes">${esc(brand)} cité (#rang)</span><span class="l-no">Non cité</span><span class="l-err">Erreur</span>`;
+            html += `<span style="margin-left:8px"><i class="sent positive"></i> <i class="sent neutral"></i> <i class="sent negative"></i> sentiment</span>`;
+            if (competitors.length) html += `<span style="margin-left:auto">Chiffre = nombre de concurrents cités</span>`;
+            if (providers.includes('google_overviews')) html += `<span class="l-noaio" style="margin-left:12px">∅ = pas d'AI Overview sur cette requête (hors calcul)</span>`;
+            html += `</div><div class="table-wrap"><table class="matrix"><thead><tr><th style="text-align:left">Prompt</th>`;
+            for (const p of providers) html += `<th>${providerById[p].icon} ${providerById[p].name}</th>`;
+            html += `<th>Score</th></tr></thead><tbody>`;
+
+            const colTotals = Object.fromEntries(providers.map(p => [p, { yes: 0, n: 0 }]));
+            for (const prompt of prompts) {
+                let yes = 0, n = 0;
+                html += `<tr><td class="prompt-cell">${esc(prompt)}</td>`;
+                for (const p of providers) {
+                    const r = results[prompt + '|' + p];
+                    if (!r) { html += `<td><span class="cell pending"><span class="spinner"></span></span></td>`; continue; }
+                    if (r.noAio) { html += `<td><span class="cell noaio" data-key="${esc(prompt + '|' + p)}" title="Pas d'AI Overview sur cette requête : résultats organiques visibles au clic, non comptés">∅</span></td>`; continue; }
+                    n++; colTotals[p].n++;
+                    if (r.status === 'error') { html += `<td><span class="cell err" data-key="${esc(prompt + '|' + p)}" title="${esc(r.error)}">!</span></td>`; continue; }
+                    if (r.mentioned) { yes++; colTotals[p].yes++; }
+                    const compCount = competitors.filter(c => r.mentions[c] > 0).length;
+                    const st = r.stats && r.stats[brand];
+                    const rank = r.mentioned && st && st.rank ? `<span class="rank">#${st.rank}</span>` : '';
+                    const sent = r.mentioned && st && st.sentiment ? `<i class="sent ${st.sentiment.label}" title="Sentiment ${SENTIMENT_FR[st.sentiment.label]}"></i>` : '';
+                    html += `<td><span class="cell ${r.mentioned ? 'yes' : 'no'}" data-key="${esc(prompt + '|' + p)}" title="Cliquer pour voir la réponse">${r.mentioned ? '✓' : '✗'}${rank}${sent}${competitors.length ? ` <small style="opacity:.75;margin-left:4px">${compCount}</small>` : ''}</span></td>`;
+                }
+                html += `<td class="score-cell">${n ? Math.round(yes / n * 100) + '%' : '–'}</td></tr>`;
+            }
+            let ty = 0, tn = 0;
+            html += `<tr class="total"><td class="prompt-cell">Share of Voice ${esc(brand)}</td>`;
+            for (const p of providers) { const t = colTotals[p]; ty += t.yes; tn += t.n; html += `<td>${t.n ? Math.round(t.yes / t.n * 100) + '%' : '–'}</td>`; }
+            html += `<td>${tn ? Math.round(ty / tn * 100) + '%' : '–'}</td></tr></tbody></table></div>`;
+
+            if (competitors.length) {
+                html += `<div class="table-wrap" style="margin-top:18px"><table class="matrix"><thead><tr><th style="text-align:left">Marque</th>`;
+                for (const p of providers) html += `<th>${providerById[p].icon} ${providerById[p].name}</th>`;
+                html += `<th>Global</th></tr></thead><tbody>`;
+                for (const name of [brand, ...competitors]) {
+                    let gy = 0, gn = 0;
+                    html += `<tr${name === brand ? ' class="total"' : ''}><td class="prompt-cell">${esc(name)}</td>`;
+                    for (const p of providers) {
+                        let y = 0, n = 0;
+                        for (const prompt of prompts) { const r = results[prompt + '|' + p]; if (r && r.status === 'ok' && !r.noAio) { n++; if (r.mentions[name] > 0) y++; } }
+                        gy += y; gn += n; html += `<td>${n ? Math.round(y / n * 100) + '%' : '–'}</td>`;
+                    }
+                    html += `<td class="score-cell">${gn ? Math.round(gy / gn * 100) + '%' : '–'}</td></tr>`;
+                }
+                html += `</tbody></table></div>`;
+            }
+            resultsContainer.innerHTML = html;
+            resultsContainer.querySelectorAll('.cell[data-key]').forEach(el => el.addEventListener('click', () => showDetail(el.dataset.key)));
+        }
+
+        function showDetail(key) {
+            const r = results[key]; if (!r) return;
+            const [prompt, provider] = [key.slice(0, key.lastIndexOf('|')), key.slice(key.lastIndexOf('|') + 1)];
+            const { brand, competitors } = currentRun;
+            $('detailTitle').textContent = `${providerById[provider].icon} ${providerById[provider].name}`;
+            const st = r.stats && r.stats[brand];
+            const extraMeta = r.mentioned && st ? ` — ${brand} : rang ${st.rank || '?'}${st.sentiment ? `, sentiment ${SENTIMENT_FR[st.sentiment.label].toLowerCase()} (${st.sentiment.score > 0 ? '+' : ''}${fmtNum(st.sentiment.score)})${st.sentiment.reason ? ' : ' + st.sentiment.reason : ''}` : ''}` : '';
+            $('detailMeta').textContent = prompt + extraMeta;
+            detailPanel.classList.toggle('err', r.status === 'error');
+            if (r.status === 'error') { $('detailText').textContent = r.error; }
+            else {
+                let text = esc(r.content);
+                const names = [brand, ...competitors].filter(Boolean).sort((a, b) => b.length - a.length);
+                for (const n of names) { const re = new RegExp(esc(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'); text = text.replace(re, m => `<mark class="${n === brand ? '' : 'comp'}">${m}</mark>`); }
+                let extra = '';
+                if (provider === 'google_overviews') {
+                    extra += r.data?.hasAiOverview ? '<div class="detail-meta" style="margin-bottom:8px">Bloc AI Overview détecté</div>' : '<div class="detail-meta" style="margin-bottom:8px">Pas d\'AI Overview sur cette requête : résultats organiques affichés à titre indicatif, non comptés dans le Share of Voice</div>';
+                    if (r.data?.aiOverviewSources?.length) extra += `<div class="detail-meta" style="margin-top:10px">Sources citées : ${r.data.aiOverviewSources.slice(0, 8).map(s => `<a href="${esc(s.link)}" target="_blank" rel="noopener">${esc(s.source || s.title)}</a>`).join(' · ')}</div>`;
+                }
+                $('detailText').innerHTML = extra.split('<div class="detail-meta" style="margin-top:10px">')[0] + text + (extra.includes('Sources citées') ? '<div class="detail-meta" style="margin-top:10px">' + extra.split('<div class="detail-meta" style="margin-top:10px">')[1] : '');
+            }
+            detailPanel.classList.add('visible');
+            detailPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        $('detailClose').addEventListener('click', () => detailPanel.classList.remove('visible'));
+
+        // ---------- Historique ----------
+        const LOCAL_KEY = 'geo_sov_history';
+        function localRead() { try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]'); } catch { return []; } }
+        function localWrite(rows) { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(rows.slice(-3000))); } catch {} }
+
+        async function saveRunToHistory() {
+            if (!currentRun) return;
+            const { id, brand, competitors, prompts, providers, sector, angle } = currentRun;
+            const rows = [];
+            for (const prompt of prompts) for (const provider of providers) {
+                const r = results[prompt + '|' + provider]; if (!r) continue;
+                rows.push({
+                    run_id: id, brand, competitors, sector, angle, prompt, provider,
+                    mentioned: r.mentioned, mentions: r.mentions,
+                    brandStats: r.status === 'ok' && !r.noAio ? r.stats : null, // rang + sentiment par marque
+                    has_ai_overview: provider === 'google_overviews' ? (r.data?.hasAiOverview ?? null) : null,
+                    excerpt: r.status === 'ok' ? String(r.content).slice(0, 4000) : null,
+                    error: r.status === 'error' ? r.error : null,
+                    created_at: new Date().toISOString()
+                });
+            }
+            await postRowsToServer(rows, brand);
+        }
+
+        async function postRowsToServer(rows, brand, isRetry) {
+            const when = new Date().toLocaleString('fr-FR');
+            try {
+                const res = await api('/api/history', { method: 'POST', body: JSON.stringify({ rows }) });
+                pendingRows = null;
+                historyMode = 'server'; toast('Résultats enregistrés dans l\'historique');
+                setSaveStatus('ok', `✅ Point d'historique enregistré le ${when} — ${res.saved ?? rows.length} lignes (partagé équipe, marque « ${esc(brand)} »).${res.warning ? ' ⚠️ ' + esc(res.warning) : ''}`);
+            } catch (e) {
+                historyMode = 'local';
+                if (!isRetry) localWrite([...localRead(), ...rows]);
+                pendingRows = { rows, brand };
+                const network = !e.status;
+                const why = e.status === 503 ? 'historique serveur non configuré' : network ? 'proxy injoignable au moment de l\'envoi (redéploiement Render ou veille)' : `erreur serveur ${e.status} : ${esc(e.message)}`;
+                const hint = network ? 'Le run est conservé dans ce navigateur : cliquez sur « Réessayer » dans 30 secondes.' : 'Vérifiez les variables SUPABASE_URL / SUPABASE_SERVICE_KEY (clé service_role) sur Render.';
+                setSaveStatus('err', `⚠️ Historique serveur NON enregistré (${why}). ${hint} <button class="btn-secondary btn-small" id="retrySaveBtn" style="margin-left:10px">↻ Réessayer l'enregistrement</button>`);
+                $('retrySaveBtn').addEventListener('click', async () => { const b = $('retrySaveBtn'); b.disabled = true; b.textContent = 'Envoi…'; await checkProxy(true); await postRowsToServer(pendingRows.rows, pendingRows.brand, true); loadHistory(true); });
+                toast('Historique serveur indisponible : sauvegarde locale');
+            }
+            setHistoryStatus();
+        }
+
+        function setHistoryStatus() {
+            const el = $('historyStatus');
+            el.className = 'pill ' + (historyMode === 'server' ? 'on' : historyMode === 'local' ? 'local' : 'off');
+            el.textContent = historyMode === 'server' ? 'partagé équipe' : historyMode === 'local' ? 'local (ce navigateur)' : 'non configuré';
+        }
+
+        async function fetchHistory(brand, days) {
+            const since = Date.now() - days * 86400000;
+            const local = localRead().filter(r => r.brand === brand && new Date(r.created_at).getTime() >= since);
+            try {
+                const data = await api(`/api/history?brand=${encodeURIComponent(brand)}&days=${days}`);
+                if (historyMode !== 'local') historyMode = 'server';
+                const server = data.rows || [];
+                const runIds = new Set(server.map(r => r.run_id));
+                return [...server, ...local.filter(r => !runIds.has(r.run_id))];
+            } catch (e) {
+                historyMode = 'local';
+                return local;
+            }
+        }
+
+        function historyBrand() {
+            return (historyBrandEdited && $('historyBrand').value.trim()) ? $('historyBrand').value.trim() : brandInput.value.trim();
+        }
+
+        async function loadHistory(silent) {
+            const brand = historyBrand();
+            if (!brand) { $('historyTable').innerHTML = '<div class="history-empty">Saisissez une marque dans la configuration (ou ci-dessus) pour afficher son historique.</div>'; $('progressBlock').innerHTML = ''; return; }
+            $('historyBrand').value = brand;
+            const days = parseInt($('historyDays').value, 10);
+            if (!silent) $('historyTable').innerHTML = '<div class="history-empty"><span class="spinner"></span>Chargement…</div>';
+            loadProgress(brand);
+            const rows = await fetchHistory(brand, days);
+            setHistoryStatus();
+            renderHistory(rows, brand);
+        }
+
+        // ---------- Progression étude par étude ----------
+        function deltaHtml(d, { unit = ' pts', lowerIsBetter = false } = {}) {
+            if (d == null) return '<span class="same">première étude</span>';
+            if (d === 0) return '<span class="same">= stable</span>';
+            const good = (d < 0) === lowerIsBetter;
+            return `<span class="${good ? 'up' : 'down'}">${good ? '▲' : '▼'} ${d > 0 ? '+' : ''}${fmtNum(d)}${unit}</span>`;
+        }
+        async function loadProgress(brand) {
+            const box = $('progressBlock');
+            let d;
+            try { d = await api(`/api/progress?brand=${encodeURIComponent(brand)}`); }
+            catch { box.innerHTML = ''; return; }
+            if (!d.found) { box.innerHTML = ''; return; }
+            const s = d.summary, dl = s.delta || {};
+            let html = `<div class="progress-head">Progression de ${esc(brand)}<small>étude du ${fmtDate(d.run.date)}${d.previous ? ` comparée à celle du ${fmtDate(d.previous.date)}` : ' — première étude, elle sert de référence'}</small></div>`;
+            html += `<div class="kpi-row">
+                <div class="kpi"><div class="kpi-value">${fmtNum(s.shareOfVoice)} %</div><div class="kpi-label">Part de voix</div><div class="kpi-delta">${deltaHtml(d.previous ? dl.shareOfVoice : null)}</div></div>
+                <div class="kpi"><div class="kpi-value">${fmtNum(s.mentionRate)} %</div><div class="kpi-label">Taux de mention</div><div class="kpi-delta">${deltaHtml(d.previous ? dl.mentionRate : null)}</div></div>
+                <div class="kpi"><div class="kpi-value">${fmtNum(s.avgRank)}</div><div class="kpi-label">Rang moyen</div><div class="kpi-delta">${deltaHtml(d.previous ? dl.avgRank : null, { unit: '', lowerIsBetter: true })}</div></div>
+                <div class="kpi"><div class="kpi-value">${s.sentimentScore == null ? '–' : (s.sentimentScore > 0 ? '+' : '') + fmtNum(s.sentimentScore)}</div><div class="kpi-label">Sentiment (-1 à +1)</div><div class="kpi-delta">${deltaHtml(d.previous ? dl.sentimentScore : null, { unit: '' })}</div></div>
+            </div>`;
+            if (d.previous && d.prompts.length) {
+                html += `<div class="table-wrap"><table class="matrix"><thead><tr><th style="text-align:left">Prompt</th>${d.providers.map(p => `<th>${esc(providerName(p))}</th>`).join('')}<th>Cité</th></tr></thead><tbody>`;
+                for (const p of d.prompts) {
+                    html += `<tr><td class="prompt-cell">${esc(p.prompt)}</td>`;
+                    for (const c of p.cells) {
+                        const n = c.now;
+                        const label = !n ? '–' : n.error ? '!' : n.mentioned ? `✓${n.rank ? ' #' + n.rank : ''}` : '✗';
+                        const cls = !n ? 'pending' : n.error ? 'err' : n.mentioned ? 'yes' : 'no';
+                        const tr = ['gagné', 'perdu', 'en hausse', 'en baisse'].includes(c.trend) ? `<span class="trend ${c.trend}">${c.trend}</span>` : '';
+                        html += `<td><span class="cell ${cls}" style="cursor:default">${label}</span>${tr}</td>`;
+                    }
+                    const diff = p.mentionedNow - p.mentionedBefore;
+                    html += `<td class="score-cell">${p.mentionedNow}/${p.providers} ${diff ? `<span class="${diff > 0 ? 'up' : 'down'}">(${diff > 0 ? '+' : ''}${diff})</span>` : ''}</td></tr>`;
+                }
+                html += `</tbody></table></div>`;
+            }
+            box.innerHTML = html;
+        }
+
+        function renderHistory(rows, brand) {
+            const sel = $('historyPrompt'); const current = sel.value;
+            const prompts = [...new Set(rows.map(r => r.prompt))].sort();
+            sel.innerHTML = '<option value="">Tous les prompts (moyenne)</option>' + prompts.map(p => `<option value="${esc(p)}"${p === current ? ' selected' : ''}>${esc(p.length > 80 ? p.slice(0, 77) + '…' : p)}</option>`).join('');
+            const filtered = sel.value ? rows.filter(r => r.prompt === sel.value) : rows;
+            const ok = filtered.filter(r => !r.error);
+
+            if (!ok.length) {
+                if (historyChart) { historyChart.destroy(); historyChart = null; }
+                $('historyTable').innerHTML = `<div class="history-empty">Aucun historique pour « ${esc(brand)} » sur cette période. Lancez une analyse pour créer le premier point.</div>`;
+                return;
+            }
+
+            // Regroupement par jour × canal
+            const byDay = {};
+            for (const r of ok) {
+                const day = r.created_at.slice(0, 10);
+                byDay[day] ??= {};
+                byDay[day][r.provider] ??= { yes: 0, n: 0 };
+                byDay[day][r.provider].n++; if (r.mentioned) byDay[day][r.provider].yes++;
+            }
+            const days = Object.keys(byDay).sort();
+            const providersSeen = PROVIDERS.filter(p => ok.some(r => r.provider === p.id));
+            const colors = { openai: '#04D99D', anthropic: '#F3D604', google: '#02c288', perplexity: '#595959', google_overviews: '#000000' };
+
+            const datasets = providersSeen.map(p => ({
+                label: p.name, borderColor: colors[p.id], backgroundColor: colors[p.id], tension: 0.25, spanGaps: true,
+                data: days.map(d => byDay[d][p.id] ? Math.round(byDay[d][p.id].yes / byDay[d][p.id].n * 100) : null)
+            }));
+            datasets.unshift({
+                label: 'Global', borderColor: '#000', backgroundColor: '#000', borderWidth: 3, borderDash: [6, 4], tension: 0.25,
+                data: days.map(d => { let y = 0, n = 0; for (const p in byDay[d]) { y += byDay[d][p].yes; n += byDay[d][p].n; } return n ? Math.round(y / n * 100) : null; })
+            });
+
+            if (historyChart) historyChart.destroy();
+            historyChart = new Chart($('historyChart'), {
+                type: 'line',
+                data: { labels: days.map(d => d.split('-').reverse().join('/')), datasets },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' }, title: { display: true, text: `Taux de citation de ${brand}` } } }, plugins: { legend: { position: 'bottom' } } }
+            });
+
+            // Tableau par prompt : dernier run vs précédent
+            const byPrompt = {};
+            for (const r of ok) { byPrompt[r.prompt] ??= {}; byPrompt[r.prompt][r.run_id] ??= { date: r.created_at, yes: 0, n: 0 }; byPrompt[r.prompt][r.run_id].n++; if (r.mentioned) byPrompt[r.prompt][r.run_id].yes++; }
+            let html = `<table class="matrix"><thead><tr><th style="text-align:left">Prompt</th><th>Runs</th><th>Dernier run</th><th>Précédent</th><th>Évolution</th></tr></thead><tbody>`;
+            for (const [prompt, runs] of Object.entries(byPrompt)) {
+                const sorted = Object.values(runs).sort((a, b) => new Date(b.date) - new Date(a.date));
+                const last = Math.round(sorted[0].yes / sorted[0].n * 100);
+                const prev = sorted[1] ? Math.round(sorted[1].yes / sorted[1].n * 100) : null;
+                const delta = prev === null ? '–' : (last - prev > 0 ? `<span style="color:var(--primary-dark)">▲ +${last - prev} pts</span>` : last - prev < 0 ? `<span style="color:var(--red)">▼ ${last - prev} pts</span>` : '=');
+                html += `<tr><td class="prompt-cell">${esc(prompt)}<small>${new Date(sorted[0].date).toLocaleDateString('fr-FR')}</small></td><td>${sorted.length}</td><td class="score-cell">${last}%</td><td>${prev === null ? '–' : prev + '%'}</td><td>${delta}</td></tr>`;
+            }
+            html += `</tbody></table>`;
+            $('historyTable').innerHTML = html;
+        }
+
+        // ---------- Exports (dernière étude de la marque, comparée à la précédente) ----------
+        async function exportStudy(btn) {
+            const brand = historyBrand();
+            if (!brand) return alert('Saisissez une marque');
+            const format = btn.dataset.export, type = btn.dataset.type || '';
+            const status = $('exportStatus');
+            const label = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>' + (format === 'slides' ? 'Création…' : 'Export…');
+            status.textContent = format === 'slides' ? 'Création de la présentation Google Slides (30 s environ)…' : '';
+            try {
+                const r = await fetch(`${PROXY_BASE}/api/export?format=${format}&brand=${encodeURIComponent(brand)}${type ? '&type=' + type : ''}`, { headers: headers() });
+                if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.message || d.error || `Erreur ${r.status}`); }
+                if (format === 'slides') {
+                    const d = await r.json();
+                    status.innerHTML = `✅ Présentation créée : <a href="${esc(d.url)}" target="_blank" rel="noopener">ouvrir dans Google Slides</a>`;
+                    return;
+                }
+                const blob = await r.blob();
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `share-of-voice-${normalize(brand).replace(/[^a-z0-9]+/g, '-')}-${new Date().toISOString().slice(0, 10)}${type === 'summary' ? '-synthese' : ''}.${format}`;
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+                status.textContent = '';
+            } catch (e) {
+                status.textContent = '⚠️ Export impossible : ' + e.message;
+            } finally { btn.disabled = false; btn.textContent = label; }
+        }
+        document.querySelectorAll('[data-export]').forEach(b => b.addEventListener('click', () => exportStudy(b)));
+
+        $('historyRefresh').addEventListener('click', () => loadHistory(false));
+        $('historyPrompt').addEventListener('change', () => loadHistory(true));
+        $('historyDays').addEventListener('change', () => loadHistory(false));
+        $('historyBrand').addEventListener('input', () => { historyBrandEdited = $('historyBrand').value.trim() !== ''; });
+        $('historyBrand').addEventListener('keydown', e => { if (e.key === 'Enter') loadHistory(false); });
+        brandInput.addEventListener('change', () => { if (!historyBrandEdited) loadHistory(true); proposeLastStudy(); });
+
+        // ---------- Reset ----------
+        clearBtn.addEventListener('click', () => {
+            promptsInput.value = ''; competitorsInput.value = ''; sectorInput.value = '';
+            results = {}; currentRun = null;
+            detailPanel.classList.remove('visible'); progressWrap.classList.remove('visible');
+            $('resultsCount').style.display = 'none';
+            resultsContainer.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📈</div><p>Lancez une analyse pour voir votre positionnement dans les réponses IA</p></div>';
+            proposeLastStudy();
+        });
+
+        // ---------- Init ----------
+        (async () => {
+            const h = await checkProxy(true);
+            historyMode = h && h.history ? 'server' : 'local';
+            setHistoryStatus();
+            loadHistory(true);
+            proposeLastStudy();
+        })();
+    </script>
+</body>
+</html>
