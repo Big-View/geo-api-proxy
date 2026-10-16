@@ -829,7 +829,13 @@
         async function postRowsToServer(rows, brand, isRetry) {
             const when = new Date().toLocaleString('fr-FR');
             try {
-                const res = await api('/api/history', { method: 'POST', body: JSON.stringify({ rows }) });
+                // Envoi par paquets : un run complet avec les réponses peut dépasser la taille acceptée par le serveur
+                const res = { saved: 0, warning: null };
+                for (let i = 0; i < rows.length; i += 8) {
+                    const part = await api('/api/history', { method: 'POST', body: JSON.stringify({ rows: rows.slice(i, i + 8) }) });
+                    res.saved += part.saved ?? Math.min(8, rows.length - i);
+                    res.warning = res.warning || part.warning || null;
+                }
                 pendingRows = null;
                 historyMode = 'server'; toast('Résultats enregistrés dans l\'historique');
                 setSaveStatus('ok', `✅ Point d'historique enregistré le ${when} — ${res.saved ?? rows.length} lignes (partagé équipe, marque « ${esc(brand)} »).${res.warning ? ' ⚠️ ' + esc(res.warning) : ''}`);
