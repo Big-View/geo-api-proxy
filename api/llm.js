@@ -46,8 +46,9 @@ module.exports = function(app) {
   }
 
   // ---------- Health ----------
-  app.get("/api/health", (req, res) => {
+  app.get("/api/health", async (req, res) => {
     res.json({
+      serpapi: await getSerpApiQuota(),
       ok: true,
       providers: {
         openai: !!process.env.API_KEY_OPENAI,
@@ -88,7 +89,7 @@ module.exports = function(app) {
       return res.status(200).json(response);
     } catch (error) {
       console.error(`❌ [ERROR] ${provider}:`, error.message);
-      return res.status(500).json({ error: 'API Error', message: error.message, provider });
+      return res.status(error.status || 500).json({ error: error.code || 'API Error', message: error.message, provider });
     }
   });
 
@@ -747,6 +748,30 @@ async function analyzeGoogleOverviews(query, brands, location) {
 // Domaines emploi/RH : exclus du comptage organique (offres d'emploi ≠ visibilité commerciale)
 const JOB_DOMAINS = /indeed|hellowork|glassdoor|welcometothejungle|linkedin\.com\/jobs|jobteaser|apec\.fr|francetravail|pole-emploi|meteojob|jobijoba|monster\.fr|regionsjob|studentjob/i;
 
+// Quota SerpAPI épuisé : erreur 429 dédiée, pour que le front arrête d'appeler ce canal
+const SERPAPI_QUOTA = /run out of searches|searches? (limit|quota)|plan.*limit/i;
+function serpApiQuotaError() {
+  const e = new Error('Quota SerpAPI épuisé : plus de recherches Google disponibles sur le forfait. Les autres canaux ne sont pas concernés.');
+  e.status = 429; e.code = 'quota_exceeded';
+  return e;
+}
+
+// Recherches restantes (account.json ne consomme pas de recherche), cache 10 min
+let serpQuotaCache = { at: 0, value: null };
+async function getSerpApiQuota() {
+  if (!process.env.SERPAPI_KEY) return null;
+  if (Date.now() - serpQuotaCache.at < 600000) return serpQuotaCache.value;
+  try {
+    const r = await fetch(`https://serpapi.com/account.json?api_key=${encodeURIComponent(process.env.SERPAPI_KEY)}`, { signal: AbortSignal.timeout(5000) });
+    const d = r.ok ? await r.json() : null;
+    const left = d ? (d.total_searches_left ?? d.plan_searches_left) : undefined;
+    serpQuotaCache = { at: Date.now(), value: Number.isFinite(left) ? { searchesLeft: left, perMonth: d.searches_per_month ?? null } : null };
+  } catch {
+    serpQuotaCache = { at: Date.now(), value: null };
+  }
+  return serpQuotaCache.value;
+}
+
 async function analyzeViaSerpApi(query, brands, location) {
   const apiKey = process.env.SERPAPI_KEY;
   const params = new URLSearchParams({
@@ -757,9 +782,16 @@ async function analyzeViaSerpApi(query, brands, location) {
   });
   if (location && String(location).trim()) params.set('location', String(location).trim().slice(0, 120));
   const response = await fetch(`https://serpapi.com/search.json?${params}`);
-  if (!response.ok) throw new Error(`SerpAPI Error ${response.status}: ${await readError(response)}`);
+  if (!response.ok) {
+    const msg = await readError(response);
+    if (response.status === 429 || SERPAPI_QUOTA.test(msg)) throw serpApiQuotaError();
+    throw new Error(`SerpAPI Error ${response.status}: ${msg}`);
+  }
   const data = await response.json();
-  if (data.error) throw new Error(`SerpAPI Error: ${data.error}`);
+  if (data.error) {
+    if (SERPAPI_QUOTA.test(data.error)) throw serpApiQuotaError();
+    throw new Error(`SerpAPI Error: ${data.error}`);
+  }
 
   let aio = data.ai_overview || null;
   if (aio?.page_token && !aio.text_blocks) {

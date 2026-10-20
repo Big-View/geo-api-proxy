@@ -607,6 +607,9 @@
                 const ko = PROVIDERS.filter(p => h.providers && h.providers[p.id] === false).map(p => p.name);
                 if (ko.length) { el.classList.add('warn'); txt.textContent = `Proxy en ligne — canaux non configurés : ${ko.join(', ')}` + (h.history ? '' : ' — historique serveur désactivé'); }
                 else { el.classList.add('ok'); txt.textContent = 'Proxy en ligne — 5 canaux configurés' + (h.history ? ', historique serveur actif' : ' — historique serveur désactivé'); }
+                const left = h.serpapi && h.serpapi.searchesLeft;
+                if (left === 0) { el.className = 'proxy-status warn'; txt.textContent += ' — quota SerpAPI épuisé : Google Overviews indisponible'; }
+                else if (Number.isFinite(left) && left < 20) txt.textContent += ` — SerpAPI : ${left} recherches restantes`;
                 return h;
             } catch (e) {
                 proxyHealth = null; el.classList.add('ko');
@@ -740,10 +743,16 @@
             progressWrap.classList.add('visible'); updateProgress(0, total);
 
             const names = [brand, ...competitors];
+            let serpQuotaMsg = null; // quota SerpAPI épuisé : on n'appelle plus Google Overviews
             const worker = async () => {
                 while (jobs.length) {
                     const job = jobs.shift();
                     const key = job.prompt + '|' + job.provider;
+                    if (serpQuotaMsg && job.provider === 'google_overviews') {
+                        results[key] = { status: 'error', error: serpQuotaMsg, quota: true, mentions: {}, mentioned: false };
+                        done++; updateProgress(done, total); renderMatrix();
+                        continue;
+                    }
                     try {
                         const data = await api('/api/llm', { method: 'POST', body: JSON.stringify({ provider: job.provider, query: job.prompt, brands: names, location: $('locationInput').value.trim() || undefined }) });
                         const content = typeof data.content === 'string' ? data.content : JSON.stringify(data.content);
@@ -761,7 +770,9 @@
                         }
                         results[key] = { status: 'ok', data, content, mentions, stats, mentioned: mentions[brand] > 0, noAio };
                     } catch (e) {
-                        results[key] = { status: 'error', error: e.message, mentions: {}, mentioned: false };
+                        const quota = e.status === 429 && job.provider === 'google_overviews';
+                        if (quota && !serpQuotaMsg) { serpQuotaMsg = e.message; toast('Quota SerpAPI épuisé : Google Overviews ignoré, les autres canaux continuent'); }
+                        results[key] = { status: 'error', error: e.message, quota, mentions: {}, mentioned: false };
                     }
                     done++; updateProgress(done, total); renderMatrix();
                 }
@@ -806,8 +817,9 @@
                     const r = results[prompt + '|' + p];
                     if (!r) { html += `<td><span class="cell pending"><span class="spinner"></span></span></td>`; continue; }
                     if (r.noAio) { html += `<td><span class="cell noaio" data-key="${esc(prompt + '|' + p)}" title="Pas d'AI Overview sur cette requête : résultats organiques visibles au clic, non comptés">∅</span></td>`; continue; }
+                    // Erreur (dont quota SerpAPI) : hors calcul, comme côté serveur
+                    if (r.status === 'error') { html += `<td><span class="cell err" data-key="${esc(prompt + '|' + p)}" title="${esc(r.error)} (non compté)">${r.quota ? 'quota' : '!'}</span></td>`; continue; }
                     n++; colTotals[p].n++;
-                    if (r.status === 'error') { html += `<td><span class="cell err" data-key="${esc(prompt + '|' + p)}" title="${esc(r.error)}">!</span></td>`; continue; }
                     if (r.mentioned) { yes++; colTotals[p].yes++; }
                     const compCount = competitors.filter(c => r.mentions[c] > 0).length;
                     const st = r.stats && r.stats[brand];
