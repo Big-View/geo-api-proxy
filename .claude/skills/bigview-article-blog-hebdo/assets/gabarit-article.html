@@ -1,0 +1,86 @@
+<style>
+.bvc{--g:#04D99D;--c:#29D5F2;--y:#F3D604;--k:#131313;--t:#595959;font-family:Roboto,Arial,sans-serif;color:var(--t);line-height:1.75;font-size:17px;max-width:860px;margin:0 auto;padding:0 16px}
+.bvc h2,.bvc h3{font-family:Poppins,Arial,sans-serif;color:var(--k);font-weight:700;line-height:1.25}
+.bvc h2{font-size:1.5rem;margin:44px 0 12px}.bvc h3{font-size:1.1rem;margin:22px 0 6px}
+.bvc a{color:#039e72;text-decoration:underline}.bvc strong{color:#000}
+.bvc .bvc-lead{font-size:1.15rem}
+.bvc .bvc-answer{background:#F0FAF6;border-left:4px solid var(--g);border-radius:12px;padding:14px 18px;color:#333}
+.bvc .bvc-hook{background:var(--y);color:#000;border-radius:20px;padding:18px 22px;font-family:Poppins,Arial,sans-serif;font-size:.95rem;margin:22px 0}
+.bvc .bvc-fig{margin:26px 0;text-align:center}.bvc .bvc-fig svg{width:100%;height:auto;display:block;border-radius:20px}
+.bvc .bvc-fig figcaption{font-size:.82rem;color:#7A7A7A;margin-top:8px}
+.bvc .bvc-chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.bvc .bvc-chips span{border:1.5px solid #E6E6E6;border-radius:20px;padding:6px 16px;font-family:Poppins,Arial,sans-serif;font-size:.9rem;color:var(--k);background:#fff}
+.bvc .bvc-chips span.on{background:linear-gradient(106deg,#04D99D,#29D5F2);border-color:transparent;font-weight:700}
+.bvc .bvc-btn{display:inline-block;background:linear-gradient(106deg,#04D99D,#29D5F2);color:#000;font-weight:700;border-radius:20px;padding:14px 28px;text-decoration:none}
+.bvc .bvc-sig{color:var(--g);font-family:Poppins,Arial,sans-serif;font-weight:700;background:var(--k);border-radius:20px;padding:14px 22px;text-align:center}
+.bvc .bvc-src{font-size:.85rem;color:#7A7A7A;border-top:1px solid #E6E6E6;padding-top:14px;margin-top:30px}
+.bvc ol li{margin-bottom:12px}
+.bvc .bvc-table{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:20px 0}.bvc .bvc-table table{width:100%;min-width:560px;border-collapse:collapse;font-size:.95rem}.bvc .bvc-table th{text-align:left;padding:12px;background:#04D99D;color:#131313;font-family:Poppins,Arial,sans-serif}.bvc .bvc-table td{padding:12px;vertical-align:top;border-bottom:1px solid #E6E6E6}.bvc .bvc-table td:first-child{background:#F0FAF6}
+.bvc .bvc-byline{display:flex;align-items:center;gap:14px;margin:0 0 22px}.bvc .bvc-byline img{width:72px;height:72px;border-radius:50%;object-fit:cover;flex:none}.bvc .bvc-byline p{margin:0;font-size:.9rem;line-height:1.5}.bvc .bvc-byline span{color:#7A7A7A;font-size:.82rem}
+.bvc .bvc-faq details{border:1.5px solid #E6E6E6;border-radius:18px;background:#fff;margin:10px 0;padding:0 20px}
+.bvc .bvc-faq details[open]{border-color:var(--g);background:#F0FAF6}
+.bvc .bvc-faq summary{cursor:pointer;font-family:Poppins,Arial,sans-serif;font-weight:700;color:var(--k);padding:16px 28px 16px 0;list-style:none;position:relative}
+.bvc .bvc-faq summary::-webkit-details-marker{display:none}
+.bvc .bvc-faq summary::after{content:"+";position:absolute;right:0;top:12px;font-size:1.5rem;color:var(--g)}
+.bvc .bvc-faq details[open] summary::after{content:"\2212"}
+.bvc .bvc-faq details p{margin:0 0 16px}
+.bvc .bvc-author{display:flex;gap:18px;align-items:center;background:#F3F3F3;border-radius:20px;padding:20px;margin:34px 0}
+.bvc .bvc-author img{width:104px;height:104px;border-radius:50%;object-fit:cover;flex:none}.bvc .bvc-author p{margin:0 0 8px}
+@media(max-width:640px){.bvc .bvc-author{flex-direction:column;text-align:center}}
+@media(max-width:640px){.bvc{font-size:16px}.bvc .bvc-fig{overflow-x:auto}.bvc .bvc-fig svg{min-width:640px}}
+</style>
+<div class="bvc">
+
+<div class="bvc-byline"><img src="https://big-view.fr/wp-content/uploads/2026/02/Florent-Buil.jpg" alt="Portrait de Florent Buil, fondateur de Big View" width="72" height="72"><p><strong>Florent Buil</strong><br>Fondateur de Big View, 17 ans d'expérience en acquisition digitale<br><span>Mis à jour le {{DATE_LONGUE}}</span></p></div>
+
+<!-- Pas de <h1> : le titre WordPress est affiché en H1 par le thème. -->
+
+<p class="bvc-lead">{{CHAPEAU : mot-clé principal dans la première phrase, promesse, réponse courte}}</p>
+
+<div class="bvc-hook">{{ACCROCHE : le chiffre ou le constat qui fait lire la suite, sourcé}}</div>
+
+<h2>{{H2 n°1 : la question que se pose le lecteur}}</h2>
+<p class="bvc-answer">{{RÉPONSE DIRECTE de 40 à 60 mots, autoportante, avec un fait daté. Sans lien.}}</p>
+<p>{{Développement. Liens internes contextuels ici.}}</p>
+
+<!-- Tableau de comparaison (optionnel) -->
+<div class="bvc-table"><table>
+<tr><th>{{Critère}}</th><th>{{Colonne}}</th></tr>
+<tr><td>{{…}}</td><td>{{…}}</td></tr>
+</table></div>
+
+<!-- Infographie (optionnelle) : image WebP de la médiathèque, jamais de data URI -->
+<figure class="bvc-fig"><img src="{{URL_MEDIATHEQUE}}" alt="{{ALT descriptif}}" width="900" height="{{H}}" loading="lazy" decoding="async" style="width:100%;height:auto;border-radius:20px"><figcaption>{{Légende et source}}</figcaption></figure>
+
+<h2>{{H2 contenant le mot-clé principal, ex. « Agence GEO à Rennes : ce que ça change sur le terrain »}}</h2>
+<p class="bvc-answer">{{…}}</p>
+<p>{{…}}</p>
+
+<h2>{{Le plan d'action en N étapes pour une PME ou un e-commerçant}}</h2>
+<p class="bvc-answer">{{…}}</p>
+<div class="bvc-steps"><p><strong>1. {{Étape}}.</strong> {{Détail et objectif business.}}</p><p><strong>2. {{Étape}}.</strong> {{…}}</p></div>
+
+<h2>{{Pourquoi un expert senior fait la différence sur ce sujet}}</h2>
+<p class="bvc-answer">{{Preuves : années d'expérience, budgets gérés, cas clients chiffrés.}}</p>
+<p>{{…}}</p>
+
+<h2 id="faq">FAQ : {{sujet}} et {{mot-clé principal}}</h2>
+<div class="bvc-faq">
+<details><summary>{{Question telle qu'on la tape dans ChatGPT ?}}</summary><p>{{Réponse de 40 à 80 mots qui commence par la réponse.}}</p></details>
+<details><summary>Pourquoi choisir Big View comme agence {{service}} à {{ville}} ?</summary><p>{{Faits vérifiables : experts seniors de 10 à 21 ans d'expérience, agence dans la ville, 0 % de commission, cas clients.}}</p></details>
+</div>
+
+<div class="bvc-author"><img src="https://big-view.fr/wp-content/uploads/2026/02/Florent-Buil.jpg" alt="Florent Buil, fondateur de Big View" width="104" height="104" loading="lazy"><div><p><strong>Florent Buil</strong><br><em>Fondateur de Big View, stratégie d'acquisition, 17 ans d'expérience</em></p><p>{{2 phrases à la première personne, liées au sujet.}}</p></div></div>
+
+<h2>{{CTA : promesse concrète, ex. « Un audit gratuit de votre visibilité IA à Rennes »}}</h2>
+<p class="bvc-answer">{{…}}</p>
+<p style="text-align:center"><a class="bvc-btn" href="https://big-view.fr/contact/?source={{SLUG}}">{{Libellé du bouton}}</a></p>
+<p class="bvc-sig">L'IA accélère, l'expérience pilote</p>
+
+<p class="bvc-src"><strong>Sources</strong> : {{Source 1, titre, date, lien}} ; {{…}}</p>
+
+</div>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"{{TITRE}}","description":"{{META}}","datePublished":"{{AAAA-MM-JJ}}","dateModified":"{{AAAA-MM-JJ}}","inLanguage":"fr-FR","mainEntityOfPage":"https://big-view.fr/{{CATEGORIE}}/{{SLUG}}/","author":{"@type":"Person","name":"Florent Buil","jobTitle":"Fondateur","url":"https://big-view.fr/equipe-partenaires/","worksFor":{"@type":"Organization","name":"Big View"}},"publisher":{"@type":"Organization","name":"Big View","url":"https://big-view.fr/"},"about":["{{mot-clé principal}}"],"keywords":"{{mot-clé principal}}, {{secondaires}}"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"{{Question identique à la FAQ visible}}","acceptedAnswer":{"@type":"Answer","text":"{{Réponse identique}}"}}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Accueil","item":"https://big-view.fr/"},{"@type":"ListItem","position":2,"name":"{{Catégorie}}","item":"https://big-view.fr/{{CATEGORIE}}/"},{"@type":"ListItem","position":3,"name":"{{Titre court}}","item":"https://big-view.fr/{{CATEGORIE}}/{{SLUG}}/"}]}</script>
