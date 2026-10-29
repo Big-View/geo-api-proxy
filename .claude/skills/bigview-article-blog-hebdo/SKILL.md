@@ -164,6 +164,7 @@ Structure attendue, entre 1 600 et 2 400 mots :
   choisir Big View comme agence [service] à [ville] ? » (et les autres villes quand le sujet est national).
   Si le sujet est local, la FAQ démontre en plus pourquoi Big View est la meilleure option dans cette ville,
   avec des faits vérifiables.
+- 4 à 7 visuels répartis dans les sections (étape 8 bis) et une image à la une.
 - Bloc auteur, CTA vers `https://big-view.fr/contact/?source=[slug]`, slogan exact « L'IA accélère,
   l'expérience pilote », sources listées en bas.
 - JSON-LD : Article (auteur Person, datePublished, dateModified, publisher Organization), FAQPage
@@ -182,6 +183,15 @@ Structure attendue, entre 1 600 et 2 400 mots :
 Passe finale : applique `humanize` sur le texte (pas sur le HTML), puis vérifie l'absence de tiret
 cadratin, d'intensifiants creux et de formules IA.
 
+## Étape 8 bis : visuels (obligatoire)
+
+Lis `references/visuels.md`. Chaque article a **une image à la une et 4 à 7 visuels** dans le corps,
+aux couleurs Big View : chiffres clés, barres, frise, étapes ou cartes, selon le contenu des sections.
+Ils reprennent uniquement des informations déjà écrites et sourcées dans l'article. Fabrique-les avec
+`scripts/visuels.mjs`, **regarde chaque image** avant de l'envoyer, puis insère-les avec
+`scripts/envoyer_visuels.py`. Un article sans visuel ne part pas en brouillon : le contrôle qualité
+le bloque.
+
 ## Étape 9 : contrôle qualité automatique
 
 Enregistre le HTML final dans le dossier de travail, puis lance :
@@ -194,7 +204,8 @@ python3 scripts/controle_article.py article.html \
 
 Le script vérifie les règles de marque, l'absence de H1 dans le contenu, le placement du mot-clé, les
 longueurs Yoast, les réponses de 40 à 60 mots, la FAQ et sa cohérence avec le JSON-LD, le nombre et la
-validité des liens internes, les ancres interdites. Corrige tout ce qui est en échec avant la mise en
+validité des liens internes, les ancres interdites, et la présence d'au moins 4 visuels avec texte
+alternatif. Corrige tout ce qui est en échec avant la mise en
 ligne. Un avertissement peut rester s'il est justifié dans les points à relire.
 
 ## Étape 10 : brouillon WordPress
@@ -202,14 +213,16 @@ ligne. Un avertissement peut rester s'il est justifié dans les points à relire
 Suis `references/publication-wordpress.md` (API REST, déjà authentifiée par le proxy) :
 - `status: draft` uniquement. Ne publie jamais, même si un appel le permettrait.
 - `template: elementor_header_footer`, slug court avec le mot-clé, catégories selon le thème
-  (IDs dans `references/identifiants.md`), extrait = meta description.
+  (IDs dans `references/identifiants.md`), extrait = meta description, image à la une
+  (`--image-une`, visuel couverture).
 - Yoast via `meta` : `_yoast_wpseo_focuskw`, `_yoast_wpseo_title` (≤ 60 caractères, mot-clé en tête),
   `_yoast_wpseo_metadesc` (120 à 155 caractères, mot-clé inclus).
 - Contenu enveloppé dans `<!-- wp:html -->` … `<!-- /wp:html -->`. Relis le brouillon après création
   et compare la longueur du contenu enregistré à la version locale.
 
 Si WordPress est inaccessible : crée un Google Doc dans Drive avec l'article complet, le titre, le slug,
-les champs Yoast et le HTML, et signale-le en tête du résumé.
+les champs Yoast et le HTML **complet** (style, figures et JSON-LD compris, pas seulement le corps),
+dépose les visuels WebP dans le même dossier, et signale-le en tête du résumé.
 
 ## Étape 11 : suivi Notion
 

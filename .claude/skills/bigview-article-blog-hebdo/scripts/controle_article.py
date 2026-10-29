@@ -91,6 +91,22 @@ def main():
     r("OK" if 5 <= len(h2s) <= 10 else "ALERTE", f"Nombre de H2 : {len(h2s)} (attendu 5 à 10)")
     nb = mots(visible)
     r("OK" if 1600 <= nb <= 2600 else "ALERTE", f"Longueur : {nb} mots (cible 1 600 à 2 400)")
+    figures = re.findall(r'<figure[^>]*>.*?</figure>', corps, re.S)
+    r("OK" if len(figures) >= 4 else "ÉCHEC", f"Visuels dans l'article : {len(figures)} (minimum 4, hors image à la une)")
+    sans_alt = [f for f in figures if not re.search(r'<img[^>]*alt="[^"]{15,}"', f)]
+    if sans_alt:
+        r("ÉCHEC", f"Visuels sans texte alternatif descriptif : {len(sans_alt)}")
+    h2_sans_visuel = 0
+    for sec in re.split(r"<h2[^>]*>", corps)[1:-1]:  # la dernière section (CTA) n'en a pas besoin
+        if texte(sec.split("</h2>")[0]).lower().startswith("faq"):
+            continue
+        if "<figure" in sec or "bvc-table" in sec:
+            h2_sans_visuel = 0
+        else:
+            h2_sans_visuel += 1
+            if h2_sans_visuel >= 3:
+                r("ALERTE", "Trois sections H2 d'affilée sans visuel ni tableau : la lecture devient un mur de texte")
+                break
     if "data:image" in h:
         r("ÉCHEC", "Image en data URI : passer par la médiathèque")
 

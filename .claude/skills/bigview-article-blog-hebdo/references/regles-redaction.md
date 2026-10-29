@@ -60,9 +60,7 @@ Titre WordPress (H1), titre SEO Yoast, première phrase du chapeau, au moins un 
 slug. Ensuite, emploi naturel : 3 à 6 occurrences sur l'article, variantes comprises. Les mots-clés
 secondaires apparaissent chacun au moins une fois, dans le texte ou la FAQ.
 
-## Visuels (optionnel)
+## Visuels
 
-Une infographie simple (SVG converti en WebP, 900 px de large) par article aide la lecture. Envoie-la
-dans la médiathèque via l'API (voir `publication-wordpress.md`) avec un texte alternatif descriptif.
-Jamais de data URI dans le contenu. Pas de logo sur fond noir. Si le temps manque, saute cette étape et
-signale-le.
+Obligatoires : une image à la une et 4 à 7 visuels dans le corps. Règles, types et scripts dans
+`references/visuels.md`.

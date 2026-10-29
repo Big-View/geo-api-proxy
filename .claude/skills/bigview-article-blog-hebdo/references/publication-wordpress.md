@@ -47,14 +47,12 @@ session plutôt que d'en créer un second.
    mets à jour le contenu par morceaux de ~9 000 caractères en l'ajoutant au contenu déjà enregistré, et
    vérifie la longueur à chaque étape.
 
-## Images (optionnel)
+## Images
 
-```bash
-curl -s -X POST https://big-view.fr/wp-json/wp/v2/media \
-  -H "Content-Disposition: attachment; filename=slug-infographie-1.webp" \
-  -H "Content-Type: image/webp" --data-binary @infographie.webp
-```
-Puis `POST /wp/v2/media/ID` avec `alt_text`. Référence l'URL `source_url` renvoyée dans le contenu.
+Passe par `scripts/envoyer_visuels.py` (voir `references/visuels.md`) : envoi dans la médiathèque,
+texte alternatif, légende, insertion dans l'article et ID de l'image à la une. À la main :
+`POST /wp/v2/media` avec `Content-Disposition: attachment; filename=…webp` et `--data-binary @fichier`,
+puis `POST /wp/v2/media/ID` avec `alt_text`, et `featured_media` sur l'article.
 
 ## Interdits
 

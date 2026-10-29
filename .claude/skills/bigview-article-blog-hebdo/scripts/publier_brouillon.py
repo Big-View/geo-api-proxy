@@ -3,7 +3,7 @@
 
 Usage :
   python3 publier_brouillon.py article.html --titre "..." --slug "..." --categories 133,21 \
-      --mot-cle "agence geo rennes" --titre-seo "..." --meta "..." [--id 12345]
+      --mot-cle "agence geo rennes" --titre-seo "..." --meta "..." [--id 12345] [--image-une 678]
 
 --id : met à jour un brouillon existant (refusé si l'article n'est pas en brouillon).
 L'authentification est injectée par le proxy de l'environnement : on passe par curl.
@@ -37,6 +37,7 @@ def main():
     ap.add_argument("--titre-seo", required=True)
     ap.add_argument("--meta", required=True)
     ap.add_argument("--id", type=int)
+    ap.add_argument("--image-une", type=int, help="ID média de l'image à la une (visuel couverture)")
     a = ap.parse_args()
 
     html = open(a.fichier, encoding="utf-8").read().strip()
@@ -58,6 +59,9 @@ def main():
         },
     }
 
+    if a.image_une:
+        payload["featured_media"] = a.image_une
+
     url = API
     if a.id:
         actuel = curl([f"{API}/{a.id}?context=edit&_fields=status"])
@@ -76,7 +80,7 @@ def main():
         sys.exit(f"Échec de création : {json.dumps(rep, ensure_ascii=False)[:500]}")
 
     pid = rep["id"]
-    verif = curl([f"{API}/{pid}?context=edit&_fields=status,content,meta,template,link"])
+    verif = curl([f"{API}/{pid}?context=edit&_fields=status,content,meta,template,link,featured_media"])
     enregistre = verif["content"]["raw"].strip()
     ok_contenu = hashlib.sha256(enregistre.encode()).hexdigest() == hashlib.sha256(html.encode()).hexdigest()
     meta = verif.get("meta", {})
@@ -87,6 +91,7 @@ def main():
         "contenu_identique": ok_contenu,
         "longueur_locale": len(html),
         "longueur_enregistree": len(enregistre),
+        "image_a_la_une": verif.get("featured_media"),
         "yoast_focus": meta.get("_yoast_wpseo_focuskw"),
         "yoast_titre": meta.get("_yoast_wpseo_title"),
         "yoast_meta": meta.get("_yoast_wpseo_metadesc"),
