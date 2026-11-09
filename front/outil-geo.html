@@ -270,6 +270,15 @@
             margin-right: 8px; vertical-align: middle;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+        /* Connexion : le jeton n'est plus écrit dans la page, il est demandé une fois par navigateur */
+        .login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+        .login-overlay.visible { display: flex; }
+        .login-box { background: var(--light); border-top: 6px solid var(--primary); border-radius: 8px; padding: 28px; width: 100%; max-width: 420px; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+        .login-box h2 { font-family: 'Raleway', sans-serif; font-weight: 800; color: var(--text-bold); margin-bottom: 8px; }
+        .login-box p { font-size: 0.9em; margin-bottom: 14px; }
+        .login-box input { width: 100%; padding: 11px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95em; margin-bottom: 12px; }
+        .login-error { color: var(--red); font-size: 0.85em; min-height: 1.2em; margin-bottom: 8px; }
+        .logout-link { margin-left: 12px; font-size: 0.85em; color: var(--text); text-decoration: underline; cursor: pointer; background: none; border: none; padding: 0; text-transform: none; letter-spacing: 0; font-family: 'Roboto', sans-serif; font-weight: 400; }
         .toast { position: fixed; bottom: 20px; right: 20px; background: var(--dark); color: var(--light); padding: 12px 18px; border-radius: 6px; font-size: 0.9em; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 99; }
         .toast.show { opacity: 1; }
 
@@ -294,7 +303,7 @@
                 <div class="header-label">Big View</div>
                 <h1>GEO Share of Voice</h1>
                 <p class="tagline">L'IA accélère, l'expérience pilote.</p>
-                <div class="proxy-status" id="proxyStatus"><span class="dot"></span><span id="proxyStatusText">Vérification du proxy…</span></div>
+                <div class="proxy-status" id="proxyStatus"><span class="dot"></span><span id="proxyStatusText">Vérification du proxy…</span><button class="logout-link" id="logoutBtn" title="Oublier le jeton sur ce navigateur">Changer de jeton</button></div>
             </div>
             <div class="hero-badge">
                 <div class="badge-text">Analysez</div>
@@ -471,11 +480,21 @@
         </div>
     </div>
     <div class="toast" id="toast"></div>
+    <div class="login-overlay" id="loginOverlay">
+        <form class="login-box" id="loginForm">
+            <h2>Connexion</h2>
+            <p>Saisissez le jeton d'équipe de l'outil GEO. Il est gardé dans ce navigateur uniquement.</p>
+            <input type="password" id="loginToken" placeholder="Jeton d'équipe" autocomplete="current-password" required>
+            <div class="login-error" id="loginError"></div>
+            <button class="btn-analyze" type="submit" id="loginBtn" style="width:100%">Se connecter</button>
+        </form>
+    </div>
 
     <script>
         // ⚡ CONFIGURATION ⚡
         const PROXY_BASE = 'https://geo-api-proxy.onrender.com';
-        const VALID_TOKEN = 'XXXXXXXXXXXXXX'; // ⚠️ remettre ici le token (identique à TEAM_TOKEN sur Render)
+        // Le jeton d'équipe n'est plus écrit ici : il est demandé à la connexion et gardé dans le navigateur
+        const TOKEN_KEY = 'geo_team_token';
         const CONCURRENCY = 3; // appels simultanés vers le proxy
 
         const PROVIDERS = [
@@ -575,10 +594,49 @@
             return out;
         }
         function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
-        function headers() { return { 'Content-Type': 'application/json', 'x-geo-token': VALID_TOKEN }; }
-        async function api(path, opts = {}) {
+        // ---------- Connexion ----------
+        let teamToken = '';
+        try { teamToken = localStorage.getItem(TOKEN_KEY) || ''; } catch {}
+        let loginWaiters = [];
+        function askToken(message) {
+            $('loginError').textContent = message || '';
+            $('loginToken').value = '';
+            $('loginOverlay').classList.add('visible');
+            setTimeout(() => $('loginToken').focus(), 50);
+            return new Promise(resolve => loginWaiters.push(resolve));
+        }
+        function forgetToken() { teamToken = ''; try { localStorage.removeItem(TOKEN_KEY); } catch {} }
+        $('loginForm').addEventListener('submit', async e => {
+            e.preventDefault();
+            const candidate = $('loginToken').value.trim();
+            if (!candidate) return;
+            const btn = $('loginBtn'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Vérification…';
+            try {
+                const r = await fetch(PROXY_BASE + '/api/auth-check', { headers: { 'x-geo-token': candidate } });
+                if (r.status === 401) { $('loginError').textContent = 'Jeton invalide.'; return; }
+                if (r.status === 429) { $('loginError').textContent = 'Trop de tentatives : réessayez dans 15 minutes.'; return; }
+                if (!r.ok) { $('loginError').textContent = `Proxy indisponible (erreur ${r.status}) : réessayez dans 30 secondes.`; return; }
+                teamToken = candidate;
+                try { localStorage.setItem(TOKEN_KEY, candidate); } catch {}
+                $('loginOverlay').classList.remove('visible');
+                loginWaiters.splice(0).forEach(r => r());
+            } catch {
+                $('loginError').textContent = 'Proxy injoignable (Render sort de veille) : réessayez dans 30 secondes.';
+            } finally { btn.disabled = false; btn.textContent = 'Se connecter'; }
+        });
+        $('logoutBtn').addEventListener('click', () => { forgetToken(); askToken(); });
+
+        function headers() { return { 'Content-Type': 'application/json', 'x-geo-token': teamToken }; }
+        async function api(path, opts = {}, retried) {
+            if (!teamToken) await askToken();
             const r = await fetch(PROXY_BASE + path, { ...opts, headers: headers() });
             const data = await r.json().catch(() => ({}));
+            if (r.status === 401 && !retried) {
+                // Jeton changé sur Render : on redemande puis on rejoue la requête
+                forgetToken();
+                await askToken('Jeton refusé : il a peut-être été changé. Saisissez le nouveau jeton.');
+                return api(path, opts, true);
+            }
             if (!r.ok) { const e = new Error(data.message || data.error || `Erreur ${r.status}`); e.status = r.status; e.data = data; throw e; }
             return data;
         }
@@ -1062,7 +1120,10 @@
             const label = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>' + (format === 'slides' ? 'Création…' : 'Export…');
             status.textContent = format === 'slides' ? 'Création de la présentation Google Slides (30 s environ)…' : '';
             try {
-                const r = await fetch(`${PROXY_BASE}/api/export?format=${format}&brand=${encodeURIComponent(brand)}${type ? '&type=' + type : ''}`, { headers: headers() });
+                if (!teamToken) await askToken();
+                const url = `${PROXY_BASE}/api/export?format=${format}&brand=${encodeURIComponent(brand)}${type ? '&type=' + type : ''}`;
+                let r = await fetch(url, { headers: headers() });
+                if (r.status === 401) { forgetToken(); await askToken('Jeton refusé : saisissez le jeton actuel.'); r = await fetch(url, { headers: headers() }); }
                 if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.message || d.error || `Erreur ${r.status}`); }
                 if (format === 'slides') {
                     const d = await r.json();

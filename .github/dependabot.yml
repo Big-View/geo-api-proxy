@@ -1,0 +1,8 @@
+# Alertes et mises à jour automatiques des dépendances npm (failles de sécurité incluses)
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

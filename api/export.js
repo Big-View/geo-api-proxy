@@ -26,6 +26,7 @@ const { groupRuns, pickRun, buildProgress } = require('./runs.js');
 const DEFAULT_SHARE_WITH = 'florent.buil@big-view.fr';
 const SENTIMENT_FR = { positive: 'Positif', neutral: 'Neutre', negative: 'Négatif' };
 const { LEVELS, levelOf } = require('./sentiment-level.js');
+const { allowedShareEmail } = require('./security.js');
 // Œil Big View dont le regard traduit le sentiment (PNG générés par scripts/build-eyes.js)
 const eyeFile = (key) => path.join(__dirname, '..', 'assets', `eye-${LEVELS.some(l => l.key === key) ? key : 'inconnu'}.png`);
 const levelLabel = (score) => { const l = levelOf(score); return l ? l.label : ''; };
@@ -704,7 +705,12 @@ async function createSlides(report, shareWith, baseUrl) {
   }
 
   const emails = [...String(shareWith || '').split(','), ...String(process.env.GOOGLE_SLIDES_SHARE_WITH || DEFAULT_SHARE_WITH).split(',')]
-    .map(e => e.trim()).filter(e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));
+    .map(e => e.trim()).filter(e => {
+      // Partage limité aux adresses Big View (SHARE_DOMAINS) : un jeton volé ne peut pas exfiltrer de rapport
+      if (allowedShareEmail(e)) return true;
+      if (e) console.warn(`⛔ [SLIDES] partage refusé hors domaine autorisé : ${e}`);
+      return false;
+    });
   const shared = [];
   for (const email of [...new Set(emails)]) {
     try {

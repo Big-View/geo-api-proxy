@@ -1,18 +1,14 @@
 const express = require("express");
+const { cors, rateLimit } = require("./api/security.js");
 const app = express();
 
-// CORS
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, X-GEO-Token, x-geo-token");
-  
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
-  }
-  
-  next();
-});
+// Render place le service derrière un proxy : l'IP du client est dans X-Forwarded-For
+app.set("trust proxy", 1);
+app.disable("x-powered-by");
+
+// CORS limité à l'outil (big-view.fr), puis limite de débit par IP
+app.use(cors);
+app.use(rateLimit);
 
 // Corps JSON : un run complet (prompts × canaux avec les réponses) dépasse la limite par défaut de 100 Ko
 app.use(express.json({ limit: "5mb" }));
