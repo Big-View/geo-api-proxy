@@ -28,22 +28,20 @@
  *   TEAM_TOKEN, API_KEY_OPENAI, API_KEY_ANTHROPIC, API_KEY_GOOGLE, API_KEY_PERPLEXITY
  *   GEMINI_MODEL (défaut gemini-3.6-flash), SERPAPI_KEY
  *   SUPABASE_URL, SUPABASE_SERVICE_KEY (optionnels : sans eux, l'historique est désactivé)
+ *   Sécurité (optionnels, voir api/security.js) : ALLOWED_ORIGINS, RATE_LIMIT_PER_MIN, SHARE_DOMAINS
  */
 
 module.exports = function(app) {
 
   // ---------- Auth commune ----------
-  function checkAuth(req, res) {
-    let token = req.headers['x-geo-token'];
-    const TEAM_TOKEN = process.env.TEAM_TOKEN;
-    if (token) token = decodeURIComponent(token);
-    if (!token || !TEAM_TOKEN || token !== TEAM_TOKEN) {
-      console.log("❌ [UNAUTHORIZED] token", token ? "présent mais invalide" : "manquant");
-      res.status(401).json({ error: 'Unauthorized', message: 'Invalid or missing authentication token' });
-      return false;
-    }
-    return true;
-  }
+  // Comparaison à temps constant et blocage après des échecs répétés : voir api/security.js
+  const { checkAuth } = require('./security.js');
+
+  // ---------- Vérification du jeton (écran de connexion de l'outil) ----------
+  app.get("/api/auth-check", (req, res) => {
+    if (!checkAuth(req, res)) return;
+    res.json({ status: 'ok' });
+  });
 
   // ---------- Health ----------
   app.get("/api/health", (req, res) => {
