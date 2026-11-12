@@ -699,13 +699,22 @@ async function callGoogle(query) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: query }] }],
-        generationConfig: { maxOutputTokens: 600, temperature: 0.7 }
+        // Les modèles Gemini récents « réfléchissent » avant de répondre, et cette réflexion consomme
+        // la même limite de jetons : avec 600, la réponse arrivait tronquée. Marge large ici.
+        generationConfig: { maxOutputTokens: parseInt(process.env.GEMINI_MAX_TOKENS || '4096', 10) || 4096, temperature: 0.7 }
       })
     }
   );
   if (!response.ok) throw new Error(`Google Error ${response.status}: ${await readError(response)}`);
   const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join('') || 'No response';
+  const candidate = data.candidates?.[0] || {};
+  // Ne garder que la réponse : les parties marquées « thought » sont la réflexion interne du modèle (souvent en anglais)
+  const text = (candidate.content?.parts || []).filter(p => p && p.text && !p.thought).map(p => p.text).join('').trim();
+  if (!text) {
+    const reason = candidate.finishReason || data.promptFeedback?.blockReason || 'réponse vide';
+    throw new Error(`Gemini n'a pas renvoyé de réponse (${reason})`);
+  }
+  if (candidate.finishReason === 'MAX_TOKENS') console.warn('⚠️ [GEMINI] réponse tronquée (MAX_TOKENS) : augmenter GEMINI_MAX_TOKENS');
   return { status: 'success', provider: 'google', content: text };
 }
 
