@@ -27,6 +27,9 @@ const { groupRuns, pickRun, buildProgress } = require('./runs.js');
 
 const DEFAULT_SHARE_WITH = 'florent.buil@big-view.fr';
 const SENTIMENT_FR = { positive: 'Positif', neutral: 'Neutre', negative: 'Négatif' };
+// Noms des moteurs tels que l'équipe et les clients les connaissent (identifiants techniques en base)
+const PROVIDER_NAMES = { openai: 'ChatGPT', anthropic: 'Claude', google: 'Gemini', perplexity: 'Perplexity', google_overviews: 'Google AI Overviews' };
+const providerName = p => PROVIDER_NAMES[p] || p || '';
 const { LEVELS, levelOf } = require('./sentiment-level.js');
 const { allowedShareEmail } = require('./security.js');
 // Œil Big View dont le regard traduit le sentiment (PNG générés par scripts/build-eyes.js)
@@ -271,7 +274,7 @@ function detailCsv({ rows, brands, brand, trends }) {
     const fs = sents[focus];
     const line = [
       r.created_at ? new Date(r.created_at).toLocaleString('fr-FR') : '',
-      r.run_id || '', r.brand || '', r.provider || '', r.prompt || '',
+      r.run_id || '', r.brand || '', providerName(r.provider), r.prompt || '',
       r.mentions && r.mentions[focus] > 0 ? 'oui' : 'non',
       ranks[focus] ?? '', fs ? levelLabel(fs.score) || SENTIMENT_FR[fs.label] : '', fs ? fs.score : '',
       TREND_FR[trends.get(`${r.prompt}|${r.provider}`)] || ''
@@ -291,7 +294,7 @@ function summaryCsv({ agg, timeline, brand }) {
     levelLabel(x.sentimentScore), ...LEVELS.map(l => (x.sentimentLevels || {})[l.key] || 0), x.mentions, responses
   ]));
   push('Global', agg.ranking, agg.responses);
-  for (const [prov, v] of Object.entries(agg.byProvider)) push(prov, v.ranking, v.responses);
+  for (const [prov, v] of Object.entries(agg.byProvider)) push(providerName(prov), v.ranking, v.responses);
   for (const w of agg.timeline) push(`Semaine ${w.week}`, w.ranking, w.responses);
   if (timeline.length) {
     lines.push([]);
@@ -359,7 +362,7 @@ function writePdf(report, stream) {
     table(doc, ['Moteur', 'Réponses', 'Part de voix', 'Taux de mention', 'Rang moyen', 'Leader'],
       Object.entries(agg.byProvider).map(([p, v]) => {
         const x = focusIn(v.ranking, brand) || {};
-        return [p, String(v.responses), fmtPct(x.shareOfVoice), fmtPct(x.mentionRate), fmtNum(x.avgRank), leaderOf(v.ranking)];
+        return [providerName(p), String(v.responses), fmtPct(x.shareOfVoice), fmtPct(x.mentionRate), fmtNum(x.avgRank), leaderOf(v.ranking)];
       }), [0.2, 0.12, 0.17, 0.17, 0.14, 0.2]);
   }
 
@@ -407,7 +410,7 @@ function writePdf(report, stream) {
     doc.fillColor(GRAY).font('Body').fontSize(8.5).text(`Chaque case indique le rang de ${brand} dans la réponse du moteur (- : non citée)${report.previousLabel ? `, et son évolution depuis l'${report.previousLabel}` : ''}.`, M, doc.y, { width: W });
     doc.moveDown(0.5);
     const pw = 0.34, cw = (1 - pw) / Math.max(provs.length, 1);
-    table(doc, ['Prompt', ...provs],
+    table(doc, ['Prompt', ...provs.map(providerName)],
       report.progress.prompts.map(p => [p.prompt, ...p.cells.map(c => cellLabel(c))]),
       [pw, ...provs.map(() => cw)]);
   }
@@ -429,7 +432,7 @@ function writePdf(report, stream) {
       const key = brand && Object.keys(r.mentions || {}).find(k => k === brand);
       const cited = key && r.mentions[key] > 0;
       const s = cited && r.sentiments && r.sentiments[key];
-      const meta = [r.provider, cited ? `citée${r.ranks && r.ranks[key] ? ` (rang ${r.ranks[key]})` : ''}` : 'non citée', s ? `sentiment ${SENTIMENT_FR[s.label].toLowerCase()}` : null].filter(Boolean).join(' · ');
+      const meta = [providerName(r.provider), cited ? `citée${r.ranks && r.ranks[key] ? ` (rang ${r.ranks[key]})` : ''}` : 'non citée', s ? `sentiment ${SENTIMENT_FR[s.label].toLowerCase()}` : null].filter(Boolean).join(' · ');
       ensureSpace(doc, 40);
       doc.fillColor(cited ? GREEN : GRAY).font('BodyBold').fontSize(8.5).text(meta, M + 8, doc.y, { width: W - 8 });
       doc.fillColor(GRAY).font('Body').fontSize(8.5).text(r.error ? `Erreur : ${r.error}` : truncate(r.excerpt, 900), M + 8, doc.y, { width: W - 8 });
@@ -470,7 +473,7 @@ function pdfCover(doc, report) {
   doc.fillColor(BLACK).font('Title').fontSize(26).text(report.brand || 'Toutes marques', M, h * 0.35 + 150, { width: w - 2 * M });
   doc.fillColor(GRAY).font('Body').fontSize(12)
     .text(report.period, M, doc.y + 6)
-    .text(`${report.agg.responses} réponses analysées${report.provider ? ` · moteur : ${report.provider}` : ''}`)
+    .text(`${report.agg.responses} réponses analysées${report.provider ? ` · moteur : ${providerName(report.provider)}` : ''}`)
     .text(`Rapport généré le ${report.generatedAt.toLocaleDateString('fr-FR')}`);
   doc.rect(0, h - 70, w, 70).fill(BLACK);
   doc.page.margins.bottom = 0; // sinon le slogan, sous la marge, ouvre une page vide
@@ -845,7 +848,7 @@ function slidesRequests(report, logoUrl, defaultSlides) {
     reqs.push(...slideTable(`${s}_tb`, s, ['Moteur', 'Réponses', 'Part de voix', 'Mention', 'Rang moyen', 'Leader'],
       Object.entries(agg.byProvider).slice(0, 10).map(([p, v]) => {
         const x = focusIn(v.ranking, brand) || {};
-        return [p, v.responses, fmtPct(x.shareOfVoice), fmtPct(x.mentionRate), fmtNum(x.avgRank), leaderOf(v.ranking)];
+        return [providerName(p), v.responses, fmtPct(x.shareOfVoice), fmtPct(x.mentionRate), fmtNum(x.avgRank), leaderOf(v.ranking)];
       })));
   }
 
@@ -890,7 +893,7 @@ function slidesRequests(report, logoUrl, defaultSlides) {
     chunks.forEach((chunk, ci) => {
       s = content(`Résultats par prompt${chunks.length > 1 ? ` (${ci + 1}/${chunks.length})` : ''}`);
       const pw = 0.4, cw = (1 - pw) / Math.max(provs.length, 1);
-      reqs.push(...slideTable(`${s}_tb`, s, ['Prompt', ...provs],
+      reqs.push(...slideTable(`${s}_tb`, s, ['Prompt', ...provs.map(providerName)],
         chunk.map(p => [truncate(p.prompt, 90), ...p.cells.map(c => cellLabel(c) || '-')]),
         { widths: [pw, ...provs.map(() => cw)], fontSize: 8 }));
     });
@@ -905,7 +908,7 @@ function slidesRequests(report, logoUrl, defaultSlides) {
           const key = brand && Object.keys(r.mentions || {}).find(k => k === brand);
           const cited = key && r.mentions[key] > 0;
           const rank = cited && r.ranks && r.ranks[key];
-          return [r.provider, cited ? `citée${rank ? ` #${rank}` : ''}` : 'non citée', r.error ? `Erreur : ${truncate(r.error, 100)}` : truncate(r.excerpt, 210)];
+          return [providerName(r.provider), cited ? `citée${rank ? ` #${rank}` : ''}` : 'non citée', r.error ? `Erreur : ${truncate(r.error, 100)}` : truncate(r.excerpt, 210)];
         }), { widths: [0.15, 0.13, 0.72], fontSize: 7 }));
     });
   }
