@@ -12,7 +12,9 @@
  * PDF / Slides : synthèse, évolution (dont sentiment), moteurs, résultats par prompt, réponses.
  * Slides : présentation créée via un compte de service.
  *   GOOGLE_SERVICE_ACCOUNT_JSON  clé JSON du compte de service (brute ou base64)
- *   GOOGLE_SLIDES_FOLDER_ID      dossier (Drive partagé conseillé) où créer la présentation
+ *   GOOGLE_SLIDES_FOLDER_ID      dossier (Drive partagé conseillé) où créer la présentation ;
+ *                                les exports PDF et CSV y sont aussi enregistrés (DRIVE_SAVE_EXPORTS=false pour désactiver).
+ *                                Lien renvoyé dans l'en-tête X-Drive-Url (ou X-Drive-Error si l'enregistrement échoue)
  *   GOOGLE_IMPERSONATE           utilisateur Workspace à emprunter (délégation domaine), optionnel
  *   GOOGLE_SLIDES_SHARE_WITH     e-mails (séparés par des virgules) à qui donner l'accès en écriture
  *                                (défaut : florent.buil@big-view.fr)
@@ -99,16 +101,28 @@ module.exports = function(app, { checkAuth, historyConfigured, readSovRows, read
     if (!report.rows.length) return res.status(404).json({ error: 'No data', message: 'Aucune donnée pour cette marque / période' });
     const base = `share-of-voice-${slug(report.brand || 'global')}-${new Date().toISOString().slice(0, 10)}`;
 
-    if (format === 'csv') {
-      const csv = opts.type === 'summary' ? summaryCsv(report) : detailCsv(report);
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="${base}.csv"`);
-      return res.send('﻿' + csv);
-    }
-    if (format === 'pdf') {
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${base}.pdf"`);
-      return writePdf(report, res);
+    if (format === 'csv' || format === 'pdf') {
+      const summary = format === 'csv' && opts.type === 'summary';
+      const body = format === 'csv'
+        ? Buffer.from('﻿' + (summary ? summaryCsv(report) : detailCsv(report)), 'utf8')
+        : await pdfBuffer(report);
+      const mime = format === 'csv' ? 'text/csv; charset=utf-8' : 'application/pdf';
+      const filename = `${base}${summary ? '-synthese' : ''}.${format}`;
+      // Copie dans le dossier Drive des rapports : un échec n'empêche pas le téléchargement
+      if (driveSaveEnabled()) {
+        const label = format === 'pdf' ? 'Rapport' : summary ? 'CSV synthèse' : 'CSV détaillé';
+        const driveName = `${report.title} - ${label} - ${report.generatedAt.toLocaleDateString('fr-FR')}.${format}`;
+        try {
+          const file = await saveToDrive(driveName, mime.split(';')[0], body);
+          res.setHeader('X-Drive-Url', file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`);
+        } catch (e) {
+          console.error('⚠️ [DRIVE] copie du rapport non enregistrée :', e.message);
+          res.setHeader('X-Drive-Error', encodeURIComponent(e.message.slice(0, 200)));
+        }
+      }
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      return res.send(body);
     }
     if (format === 'slides') {
       if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
@@ -583,6 +597,45 @@ function bars(doc, items, highlight) {
   }
   doc.x = M;
   doc.y = y + 4;
+}
+
+// =====================================================
+// Copie des exports PDF / CSV dans le dossier Drive des rapports
+// =====================================================
+function pdfBuffer(report) {
+  const { PassThrough } = require('stream');
+  return new Promise((resolve, reject) => {
+    const sink = new PassThrough(), chunks = [];
+    sink.on('data', c => chunks.push(c));
+    sink.on('end', () => resolve(Buffer.concat(chunks)));
+    sink.on('error', reject);
+    try { writePdf(report, sink); } catch (e) { reject(e); }
+  });
+}
+
+function driveSaveEnabled() {
+  return !!(process.env.GOOGLE_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_SLIDES_FOLDER_ID)
+    && String(process.env.DRIVE_SAVE_EXPORTS || 'true').toLowerCase() !== 'false';
+}
+
+async function saveToDrive(name, mimeType, buffer) {
+  const token = await googleToken(['https://www.googleapis.com/auth/drive']);
+  const boundary = `geo${crypto.randomBytes(12).toString('hex')}`;
+  const meta = { name, mimeType, parents: [process.env.GOOGLE_SLIDES_FOLDER_ID] };
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`),
+    buffer,
+    Buffer.from(`\r\n--${boundary}--`)
+  ]);
+  const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body
+  });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : {};
+  if (!response.ok) throw new Error(`Google Drive ${response.status}: ${data.error?.message || text}`);
+  return data;
 }
 
 // =====================================================

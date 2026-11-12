@@ -25,6 +25,7 @@ function cors(req, res, next) {
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type, X-GEO-Token, x-geo-token');
     res.header('Access-Control-Max-Age', '600');
+    res.header('Access-Control-Expose-Headers', 'X-Drive-Url, X-Drive-Error');
   }
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();

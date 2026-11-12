@@ -1118,7 +1118,7 @@
             const format = btn.dataset.export, type = btn.dataset.type || '';
             const status = $('exportStatus');
             const label = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>' + (format === 'slides' ? 'Création…' : 'Export…');
-            status.textContent = format === 'slides' ? 'Création de la présentation Google Slides (30 s environ)…' : '';
+            status.textContent = format === 'slides' ? 'Création de la présentation Google Slides (30 s environ)…' : 'Préparation du fichier et enregistrement dans le Drive…';
             try {
                 if (!teamToken) await askToken();
                 const url = `${PROXY_BASE}/api/export?format=${format}&brand=${encodeURIComponent(brand)}${type ? '&type=' + type : ''}`;
@@ -1136,7 +1136,11 @@
                 a.download = `share-of-voice-${normalize(brand).replace(/[^a-z0-9]+/g, '-')}-${new Date().toISOString().slice(0, 10)}${type === 'summary' ? '-synthese' : ''}.${format}`;
                 document.body.appendChild(a); a.click(); a.remove();
                 setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-                status.textContent = '';
+                // Le proxy range aussi une copie dans le dossier Drive des rapports
+                const driveUrl = r.headers.get('X-Drive-Url'), driveErr = r.headers.get('X-Drive-Error');
+                if (driveUrl) status.innerHTML = `✅ Fichier téléchargé et enregistré dans le Drive : <a href="${esc(driveUrl)}" target="_blank" rel="noopener">ouvrir dans le dossier Share of Voice</a>`;
+                else if (driveErr) status.textContent = '⚠️ Fichier téléchargé, mais pas enregistré dans le Drive : ' + decodeURIComponent(driveErr);
+                else status.textContent = '✅ Fichier téléchargé.';
             } catch (e) {
                 status.textContent = '⚠️ Export impossible : ' + e.message;
             } finally { btn.disabled = false; btn.textContent = label; }
