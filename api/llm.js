@@ -763,10 +763,7 @@ async function analyzeViaSerpApi(query, brands, location) {
     api_key: apiKey
   });
   if (location && String(location).trim()) params.set('location', String(location).trim().slice(0, 120));
-  const response = await fetch(`https://serpapi.com/search.json?${params}`);
-  if (!response.ok) throw new Error(`SerpAPI Error ${response.status}: ${await readError(response)}`);
-  const data = await response.json();
-  if (data.error) throw new Error(`SerpAPI Error: ${data.error}`);
+  const { data, locationIgnored } = await serpSearch(params);
 
   let aio = data.ai_overview || null;
   if (aio?.page_token && !aio.text_blocks) {
@@ -788,9 +785,48 @@ async function analyzeViaSerpApi(query, brands, location) {
     hasAiOverview: Boolean(aioText), content,
     aiOverview: aioText || null, aiOverviewSources: aioSources, organic,
     location: location || null,
+    locationIgnored,
     sources: [...aioSources, ...organicClean.map(o => ({ title: o.title, link: o.link }))],
     mentionText: `${aioText || ''}\n${organicClean.map(o => o.title + ' ' + o.snippet).join(' ')}`
   };
+}
+
+// SerpAPI renvoie parfois 503 « We couldn't get valid results… » ou 429 : échecs passagers côté Google.
+// On réessaie (2 s puis 5 s) ; si la recherche localisée échoue encore, dernier essai sans localisation.
+const SERP_RETRY_DELAYS = [2000, 5000];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function serpSearch(params) {
+  const attempt = async (p) => {
+    const response = await fetch(`https://serpapi.com/search.json?${p}`);
+    if (!response.ok) {
+      const err = new Error(`SerpAPI Error ${response.status}: ${await readError(response)}`);
+      err.retryable = response.status === 429 || response.status >= 500;
+      throw err;
+    }
+    const data = await response.json();
+    if (data.error) {
+      const err = new Error(`SerpAPI Error: ${data.error}`);
+      err.retryable = /couldn't get valid results|try again later/i.test(data.error);
+      throw err;
+    }
+    return data;
+  };
+  let lastError;
+  for (let i = 0; i <= SERP_RETRY_DELAYS.length; i++) {
+    try { return { data: await attempt(params), locationIgnored: false }; }
+    catch (e) {
+      lastError = e;
+      if (!e.retryable || i === SERP_RETRY_DELAYS.length) break;
+      console.warn(`⚠️ [SERPAPI] ${e.message} : nouvel essai dans ${SERP_RETRY_DELAYS[i] / 1000} s`);
+      await sleep(SERP_RETRY_DELAYS[i]);
+    }
+  }
+  if (lastError.retryable && params.has('location')) {
+    const p2 = new URLSearchParams(params); p2.delete('location');
+    console.warn('⚠️ [SERPAPI] échec avec localisation, dernier essai sans localisation');
+    try { return { data: await attempt(p2), locationIgnored: true }; } catch (e) { lastError = e; }
+  }
+  throw lastError;
 }
 
 function extractAioText(aio) {

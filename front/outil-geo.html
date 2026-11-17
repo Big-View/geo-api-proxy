@@ -917,6 +917,7 @@
                 for (const n of names) { const re = new RegExp(esc(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'); text = text.replace(re, m => `<mark class="${n === brand ? '' : 'comp'}">${m}</mark>`); }
                 let extra = '';
                 if (provider === 'google_overviews') {
+                    if (r.data?.locationIgnored) extra += `<div class="detail-meta" style="margin-bottom:8px">⚠️ Google n'a pas répondu pour la localisation « ${esc(r.data.location || '')} » : résultat obtenu sans localisation.</div>`;
                     extra += r.data?.hasAiOverview ? '<div class="detail-meta" style="margin-bottom:8px">Bloc AI Overview détecté</div>' : '<div class="detail-meta" style="margin-bottom:8px">Pas d\'AI Overview sur cette requête : résultats organiques affichés à titre indicatif, non comptés dans le Share of Voice</div>';
                     if (r.data?.aiOverviewSources?.length) extra += `<div class="detail-meta" style="margin-top:10px">Sources citées : ${r.data.aiOverviewSources.slice(0, 8).map(s => `<a href="${esc(s.link)}" target="_blank" rel="noopener">${esc(s.source || s.title)}</a>`).join(' · ')}</div>`;
                 }
